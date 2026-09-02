@@ -1,0 +1,61 @@
+# Local infrastructure.
+#
+# None of this is required to run FloodRelay: the default configuration uses an
+# in-process store and the local filesystem for media, and /healthz reports
+# which backend is actually in use. Bring this up when you want to exercise the
+# DynamoDB, S3 and tracing paths.
+#
+#   docker compose -f infra/docker-compose.yml up -d
+#
+# Then in backend/.env:
+#   DDB_ENDPOINT=http://localhost:8000
+#   S3_ENDPOINT=http://localhost:9000
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: floodrelay-dynamodb
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/data"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: floodrelay-minio
+    command: server /data --console-address ":9001"
+    environment:
+      # Local development credentials only. Never used outside this compose file.
+      MINIO_ROOT_USER: floodrelay
+      MINIO_ROOT_PASSWORD: floodrelay-local
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: floodrelay-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+
+volumes:
+  dynamodb-data:
+  minio-data:

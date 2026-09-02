@@ -1,0 +1,78 @@
+# AgentCore Runtime configuration for the FloodRelay agent.
+#
+# NOT APPLIED. Written from the documented shape, never run against AWS from
+# this machine (no credentials were available). Verify field names against the
+# current AgentCore API before trusting it, and replace every <PLACEHOLDER>.
+
+name: floodrelay-agent
+description: >-
+  Flood-relief coordination agent. Extracts, geolocates, de-duplicates and
+  triages help requests, and refuses to dispatch anything without a human
+  decision.
+
+container:
+  image: "<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/floodrelay-agent:latest"
+  port: 8080
+
+executionRoleArn: "arn:aws:iam::<ACCOUNT_ID>:role/FloodRelayAgentExecutionRole"
+
+networkConfiguration:
+  # The agent makes outbound calls to Nominatim, Overpass, Open-Meteo and
+  # ReliefWeb. It needs egress; it does not need to be publicly reachable.
+  networkMode: PUBLIC
+
+environment:
+  MODEL_PROVIDER: bedrock
+  AWS_REGION: us-east-1
+  BEDROCK_MODEL_HEAVY: us.amazon.nova-pro-v1:0
+  BEDROCK_MODEL_LIGHT: us.amazon.nova-lite-v1:0
+
+  DDB_TABLE: floodrelay
+  S3_BUCKET: floodrelay-media
+  # DDB_ENDPOINT and S3_ENDPOINT are intentionally absent: they exist only to
+  # point at DynamoDB Local and MinIO. Setting them here would send production
+  # traffic to a machine that does not exist.
+
+  # Put a real contact address here. Nominatim returns HTTP 403 for placeholder
+  # domains such as example.org -- verified against the live service.
+  NOMINATIM_USER_AGENT: "FloodRelay/0.1 (<YOUR_CONTACT>)"
+  GEOCODE_VIEWBOX: "71.65,34.15,72.30,33.85"
+
+  OTEL_EXPORTER_OTLP_ENDPOINT: "<OTLP_COLLECTOR_ENDPOINT>"
+  OTEL_SERVICE_NAME: floodrelay-agent
+
+  DEMO_MODE: "false"
+  CORS_ORIGINS: "<CONSOLE_ORIGIN>"
+
+# Set INTERNAL_TOKEN as a secret, not here, and pass it as X-Internal-Token
+# from the scheduler. Without it /internal/rescan is unauthenticated.
+secrets:
+  - name: INTERNAL_TOKEN
+    valueFrom: "arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:floodrelay/internal-token"
+
+healthCheck:
+  path: /healthz
+  # Startup installs the seed roster and opens the store, so allow for it.
+  startPeriodSeconds: 30
+  intervalSeconds: 30
+  timeoutSeconds: 5
+  retries: 3
+
+observability:
+  logs:
+    destination: cloudwatch
+    logGroup: /aws/agentcore/floodrelay
+  tracing:
+    enabled: true
+
+# Periodic re-evaluation. Recency decays over six hours, so hourly keeps the
+# board honest without re-scoring constantly. This targets /internal/rescan --
+# NOT /demo/rescan, which refuses when DEMO_MODE is false.
+schedule:
+  - name: floodrelay-rescan
+    expression: "rate(1 hour)"
+    target:
+      path: /internal/rescan
+      method: POST
+      headers:
+        X-Internal-Token: "${INTERNAL_TOKEN}"

@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 560" width="1180" height="560" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+  <title>FloodRelay pipeline architecture</title>
+  <desc>Help requests flow through intake, extract, geolocate, dedupe, triage and match. The gate applies four rules and halts, writing a decision card that only a human can resolve. Nothing is dispatched without that approval.</desc>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#93aebd"/>
+    </marker>
+    <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#ffc24b"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#4fd1a5"/>
+    </marker>
+    <style>
+      .n  { fill:#10222e; stroke:#23485c; stroke-width:1.5; rx:4 }
+      .nm { fill:#16303f; stroke:#3e9bd6; stroke-width:1.5; rx:4 }
+      .ns { fill:#1a1a12; stroke:#ffc24b; stroke-width:2;   rx:4 }
+      .ng { fill:#10222e; stroke:#4fd1a5; stroke-width:1.5; rx:4 }
+      .t  { fill:#e8f1f5; font-size:13px; font-weight:600 }
+      .s  { fill:#93aebd; font-size:10.5px }
+      .l  { fill:#93aebd; font-size:10px }
+      .lw { fill:#ffc24b; font-size:10px; font-weight:600 }
+      .e  { stroke:#93aebd; stroke-width:1.4; fill:none; marker-end:url(#a) }
+      .ew { stroke:#ffc24b; stroke-width:1.8; fill:none; marker-end:url(#aw) }
+      .eg { stroke:#4fd1a5; stroke-width:1.4; fill:none; marker-end:url(#ag) }
+      .ed { stroke:#93aebd; stroke-width:1.4; fill:none; stroke-dasharray:5 4; marker-end:url(#a) }
+      .hd { fill:#93aebd; font-size:11px; font-weight:600; letter-spacing:.08em }
+    </style>
+  </defs>
+
+  <rect width="1180" height="560" fill="#0a1620"/>
+
+  <!-- ingress -->
+  <text class="hd" x="24" y="30">INTAKE</text>
+  <rect class="n" x="24" y="44"  width="118" height="30"/>
+  <text class="t" x="83" y="63" text-anchor="middle">Web form</text>
+  <rect class="n" x="24" y="82"  width="118" height="30"/>
+  <text class="t" x="83" y="101" text-anchor="middle">WhatsApp / SMS</text>
+  <rect class="n" x="24" y="120" width="118" height="30"/>
+  <text class="t" x="83" y="139" text-anchor="middle">Bulk paste</text>
+
+  <path class="e" d="M142 59 C170 59 172 92 190 92"/>
+  <path class="e" d="M142 97 L190 97"/>
+  <path class="e" d="M142 135 C170 135 172 102 190 102"/>
+
+  <!-- pipeline row -->
+  <rect class="n" x="192" y="76" width="132" height="46"/>
+  <text class="t" x="258" y="95"  text-anchor="middle">intake</text>
+  <text class="s" x="258" y="111" text-anchor="middle">normalise · redact PII</text>
+
+  <rect class="nm" x="360" y="76" width="132" height="46"/>
+  <text class="t" x="426" y="95"  text-anchor="middle">extract</text>
+  <text class="s" x="426" y="111" text-anchor="middle">model + grounding</text>
+
+  <rect class="n" x="528" y="76" width="132" height="46"/>
+  <text class="t" x="594" y="95"  text-anchor="middle">geolocate</text>
+  <text class="s" x="594" y="111" text-anchor="middle">geocode, cached</text>
+
+  <rect class="n" x="696" y="76" width="132" height="46"/>
+  <text class="t" x="762" y="95"  text-anchor="middle">dedupe</text>
+  <text class="s" x="762" y="111" text-anchor="middle">deterministic</text>
+
+  <path class="e" d="M324 99 L358 99"/>
+  <path class="e" d="M492 99 L526 99"/>
+  <path class="e" d="M660 99 L694 99"/>
+
+  <!-- retry edge: geolocate back to extract, once -->
+  <path class="ed" d="M560 76 C540 34 470 34 448 74"/>
+  <text class="l" x="504" y="34" text-anchor="middle">confidence &lt; 0.55 — once only</text>
+
+  <!-- duplicate exit -->
+  <path class="eg" d="M762 122 L762 168"/>
+  <text class="l" x="772" y="148">score ≥ 0.75</text>
+  <rect class="ng" x="690" y="170" width="144" height="30"/>
+  <text class="t" x="762" y="189" text-anchor="middle">closed as duplicate</text>
+
+  <!-- second row -->
+  <rect class="nm" x="360" y="250" width="132" height="46"/>
+  <text class="t" x="426" y="269" text-anchor="middle">triage</text>
+  <text class="s" x="426" y="285" text-anchor="middle">scoring computes</text>
+
+  <rect class="n" x="528" y="250" width="132" height="46"/>
+  <text class="t" x="594" y="269" text-anchor="middle">match</text>
+  <text class="s" x="594" y="285" text-anchor="middle">nearest capable</text>
+
+  <rect class="ns" x="696" y="250" width="132" height="46"/>
+  <text class="t" x="762" y="269" text-anchor="middle">gate</text>
+  <text class="s" x="762" y="285" text-anchor="middle">four rules · halts</text>
+
+  <path class="e" d="M762 122 C762 150 500 150 494 248" />
+  <path class="e" d="M492 273 L526 273"/>
+  <path class="e" d="M660 273 L694 273"/>
+
+  <!-- match hands back to dedupe on contention -->
+  <path class="ed" d="M594 250 C594 214 790 220 800 124"/>
+  <text class="l" x="700" y="216" text-anchor="middle">contention found</text>
+
+  <!-- gate outcomes -->
+  <path class="eg" d="M828 262 L900 262"/>
+  <text class="l" x="864" y="253" text-anchor="middle">no rule applies</text>
+  <rect class="ng" x="902" y="247" width="154" height="30"/>
+  <text class="t" x="979" y="266" text-anchor="middle">agent proceeds alone</text>
+
+  <path class="ew" d="M762 296 L762 340"/>
+  <text class="lw" x="772" y="322">a rule fires</text>
+
+  <rect class="ns" x="678" y="342" width="168" height="46"/>
+  <text class="t" x="762" y="361" text-anchor="middle">DecisionCard</text>
+  <text class="s" x="762" y="377" text-anchor="middle">the graph stops here</text>
+
+  <path class="ew" d="M762 388 L762 430"/>
+  <rect class="ns" x="678" y="432" width="168" height="34" rx="17"/>
+  <text class="t" x="762" y="454" text-anchor="middle">coordinator answers</text>
+
+  <!-- resume + dispatch -->
+  <path class="e" d="M678 449 C560 449 560 330 594 300"/>
+  <text class="l" x="560" y="420" text-anchor="middle">re-enters at match</text>
+
+  <path class="ew" d="M846 449 L916 449"/>
+  <rect class="ns" x="918" y="432" width="150" height="34"/>
+  <text class="t" x="993" y="447" text-anchor="middle">roster_assign</text>
+  <text class="s" x="993" y="460" text-anchor="middle">gated · approval spent</text>
+
+  <!-- gate rules -->
+  <text class="hd" x="24" y="253">THE GATE STOPS FOR</text>
+  <text class="s" x="24" y="275">1 · rescue or medical — always</text>
+  <text class="s" x="24" y="292">2 · location confidence below 0.55</text>
+  <text class="s" x="24" y="309">3 · two requests, one resource</text>
+  <text class="s" x="24" y="326">4 · duplicate between 0.40 and 0.75</text>
+
+  <text class="hd" x="24" y="372">DETERMINISTIC, NOT THE MODEL</text>
+  <text class="s" x="24" y="394">urgency score · distance and ETA</text>
+  <text class="s" x="24" y="411">duplicate similarity · the gate rules</text>
+
+  <text class="hd" x="24" y="452">LEGEND</text>
+  <rect class="nm" x="24" y="464" width="16" height="12"/>
+  <text class="s" x="48" y="474">uses the model</text>
+  <rect class="n"  x="24" y="482" width="16" height="12"/>
+  <text class="s" x="48" y="492">pure Python</text>
+  <rect class="ns" x="24" y="500" width="16" height="12"/>
+  <text class="s" x="48" y="510">needs a human</text>
+
+  <text class="s" x="24" y="536" fill="#6f8b9a">Nothing reaches a responder without an approved DecisionCard. Enforced by a hook on every tool call, not by a prompt.</text>
+</svg>

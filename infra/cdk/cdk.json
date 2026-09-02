@@ -1,0 +1,9 @@
+{
+  "app": "python app.py",
+  "watch": { "exclude": ["**/__pycache__/**", "cdk.out/**"] },
+  "context": {
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": true
+  }
+}

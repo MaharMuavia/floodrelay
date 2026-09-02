@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Environment: never commit real credentials or contact addresses
+.env
+.env.local
+!.env.example
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Uploaded media (synthetic seed photos are committed; runtime uploads are not)
+backend/seed/photos/*
+!backend/seed/photos/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "res_boat_1",
+    "name": "Rescue boat Alpha",
+    "kind": "boat",
+    "capabilities": ["water_rescue", "transport"],
+    "capacity": 8,
+    "lat": 34.0151,
+    "lon": 71.9747,
+    "status": "available"
+  },
+  {
+    "id": "res_med_1",
+    "name": "Mobile medical team 1",
+    "kind": "medical_team",
+    "capabilities": ["first_aid", "advanced_medical", "transport"],
+    "capacity": 4,
+    "lat": 34.0089,
+    "lon": 71.9812,
+    "status": "available"
+  },
+  {
+    "id": "res_med_2",
+    "name": "Mobile medical team 2",
+    "kind": "medical_team",
+    "capabilities": ["first_aid"],
+    "capacity": 4,
+    "lat": 33.9954,
+    "lon": 72.0431,
+    "status": "available"
+  },
+  {
+    "id": "res_shelter_1",
+    "name": "Government Boys High School, Pabbi",
+    "kind": "shelter",
+    "capabilities": ["overnight_shelter", "clean_water", "wheelchair_access"],
+    "capacity": 220,
+    "lat": 33.9861,
+    "lon": 71.8003,
+    "status": "available"
+  },
+  {
+    "id": "res_shelter_2",
+    "name": "Community hall, Nowshera Kalan",
+    "kind": "shelter",
+    "capabilities": ["overnight_shelter", "clean_water"],
+    "capacity": 140,
+    "lat": 34.0203,
+    "lon": 71.9689,
+    "status": "available"
+  },
+  {
+    "id": "res_shelter_3",
+    "name": "Girls College hostel, Risalpur",
+    "kind": "shelter",
+    "capabilities": ["overnight_shelter", "clean_water", "wheelchair_access"],
+    "capacity": 90,
+    "lat": 34.0672,
+    "lon": 71.9944,
+    "status": "available"
+  },
+  {
+    "id": "res_food_1",
+    "name": "Food and water truck 1",
+    "kind": "food_truck",
+    "capabilities": ["food_distribution", "clean_water", "transport"],
+    "capacity": 400,
+    "lat": 34.0118,
+    "lon": 71.9601,
+    "status": "available"
+  }
+]

@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "../styles/tokens.css";
+
+@layer base {
+  body {
+    font-family: var(--font-mona), system-ui, sans-serif;
+    font-size: var(--t-13);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Coordinates, timestamps, request ids and trace ids only. Mono is for data
+     that must be compared character by character, never for decoration. */
+  .data {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: var(--t-12);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Urgency scores in the queue. Mona Sans has a width axis, so the numerals
+     run slightly condensed: a column of scores reads as one tight block the eye
+     can scan, without shrinking the type. Tabular figures keep the decimal
+     points aligned. */
+  .numeral {
+    font-family: var(--font-mona), system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-stretch: 92%;
+    letter-spacing: -0.01em;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-mona), system-ui, sans-serif;
+    font-weight: 600;
+    /* Headings sit a touch tighter than body text; Mona Sans is a wide face at
+       its default width and drifts apart at display sizes otherwise. */
+    font-stretch: 96%;
+    letter-spacing: -0.011em;
+  }
+}
