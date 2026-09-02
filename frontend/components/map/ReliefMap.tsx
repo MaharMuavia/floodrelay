@@ -77,6 +77,12 @@ export function ReliefMap({
   }, []);
 
   // Heatmap layer, toggled.
+  //
+  // `load` fires before the style is necessarily usable -- sprites and glyphs
+  // are still arriving -- and touching sources or layers before then throws
+  // "Style is not done loading". That is not a hot-reload artefact: it is what
+  // a real client on a slow connection hits, which is this project's stated
+  // operating condition. So wait for the style itself, not just for `load`.
   useEffect(() => {
     const m = map.current;
     if (!m || !ready) return;
@@ -90,6 +96,27 @@ export function ReliefMap({
       })),
     };
 
+    const apply = () => {
+      // The map can be torn down between the event firing and this running.
+      if (!map.current || !map.current.isStyleLoaded()) return;
+      applyHeatLayer(map.current, geojson, showHeat);
+    };
+
+    if (m.isStyleLoaded()) {
+      apply();
+    } else {
+      m.once("styledata", apply);
+      return () => {
+        m.off("styledata", apply);
+      };
+    }
+  }, [heatmap, ready, showHeat]);
+
+  function applyHeatLayer(
+    m: MapLibreMap,
+    geojson: GeoJSON.FeatureCollection,
+    visible: boolean,
+  ) {
     const existing = m.getSource("heat") as maplibregl.GeoJSONSource | undefined;
     if (existing) {
       existing.setData(geojson);
@@ -115,8 +142,8 @@ export function ReliefMap({
         },
       });
     }
-    m.setLayoutProperty("heat", "visibility", showHeat ? "visible" : "none");
-  }, [heatmap, ready, showHeat]);
+    m.setLayoutProperty("heat", "visibility", visible ? "visible" : "none");
+  }
 
   // Pins. Rebuilt on change: the counts here are tens, not thousands.
   useEffect(() => {

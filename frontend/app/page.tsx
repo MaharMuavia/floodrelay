@@ -157,10 +157,12 @@ export default function BoardPage() {
         </div>
       ) : null}
 
-      <header className="flex shrink-0 items-baseline justify-between border-b border-line px-4 py-2">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-18 text-ink">FloodRelay</h1>
-          <span className="text-ink-muted">
+      {/* Stacks on a narrow window: side by side, the status line and the nav
+          wrap into each other and read as one garbled sentence. */}
+      <header className="flex shrink-0 flex-col gap-1 border-b border-line px-4 py-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 text-18 text-ink">FloodRelay</h1>
+          <span className="min-w-0 text-ink-muted">
             Nowshera district · {counts?.open ?? 0} open ·{" "}
             {pending > 0 ? (
               <span className="font-medium text-signal">{pending} awaiting you</span>
@@ -169,7 +171,7 @@ export default function BoardPage() {
             )}
           </span>
         </div>
-        <nav className="flex items-center gap-4 text-12">
+        <nav className="flex shrink-0 items-center gap-4 text-12">
           <Link href="/audit" className="text-ink-muted hover:text-ink">
             Audit
           </Link>
