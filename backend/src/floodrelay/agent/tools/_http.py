@@ -73,6 +73,26 @@ def user_agent() -> str:
     return get_settings().nominatim_user_agent
 
 
+def _error_detail(resp: httpx.Response) -> str:
+    """Status line, plus the service's own words when it bothered to say any.
+
+    "HTTP 403" sends an operator hunting. "HTTP 403 ...: You are not using an
+    approved appname" tells them exactly what to fix, so the message the service
+    supplied is carried through rather than thrown away.
+    """
+    detail = f"HTTP {resp.status_code} from {resp.request.url.host}"
+    try:
+        body = resp.json()
+    except ValueError:
+        return detail
+    if isinstance(body, dict):
+        error = body.get("error")
+        message = error.get("message") if isinstance(error, dict) else error
+        if isinstance(message, str) and message.strip():
+            return f"{detail}: {message.strip()}"
+    return detail
+
+
 def get_json(
     url: str,
     *,
@@ -96,13 +116,80 @@ def get_json(
         return HttpResult.failure(f"network error: {exc.__class__.__name__}: {exc}")
 
     if resp.status_code >= 400:
-        return HttpResult.failure(
-            f"HTTP {resp.status_code} from {resp.request.url.host}", status=resp.status_code
-        )
+        return HttpResult.failure(_error_detail(resp), status=resp.status_code)
     try:
         return HttpResult(ok=True, status=resp.status_code, data=resp.json())
     except ValueError:
         return HttpResult.failure("response was not valid JSON", status=resp.status_code)
+
+
+def get_text(
+    url: str,
+    *,
+    params: dict[str, Any] | None = None,
+    timeout: float = 10.0,
+    limiter: RateLimiter | None = None,
+    accept: str = "text/xml",
+) -> HttpResult:
+    """GET and return the body as text, for the services that speak XML.
+
+    Same contract as `get_json`: no exception escapes, every failure mode comes
+    back as a value. NASA GIBS publishes WMTS capabilities as XML, and ReliefWeb
+    still serves RSS without an approved appname, so JSON is not enough here.
+    """
+    if limiter is not None:
+        limiter.acquire()
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+            resp = client.get(
+                url, params=params, headers={"User-Agent": user_agent(), "Accept": accept}
+            )
+    except httpx.TimeoutException:
+        return HttpResult.failure(f"timed out after {timeout}s")
+    except httpx.HTTPError as exc:
+        return HttpResult.failure(f"network error: {exc.__class__.__name__}: {exc}")
+
+    if resp.status_code >= 400:
+        return HttpResult.failure(
+            f"HTTP {resp.status_code} from {resp.request.url.host}", status=resp.status_code
+        )
+    return HttpResult(ok=True, status=resp.status_code, data=resp.text)
+
+
+def get_bytes(
+    url: str,
+    *,
+    timeout: float = 60.0,
+    limiter: RateLimiter | None = None,
+    max_bytes: int = 32 * 1024 * 1024,
+) -> HttpResult:
+    """GET a binary body, for the sources that publish documents rather than data.
+
+    `max_bytes` is a guard, not a preference: a scraped URL is one someone else
+    controls, and an unbounded read of a file we did not create is how a console
+    runs out of memory on the night it is needed.
+    """
+    if limiter is not None:
+        limiter.acquire()
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+            resp = client.get(url, headers={"User-Agent": user_agent()})
+    except httpx.TimeoutException:
+        return HttpResult.failure(f"timed out after {timeout}s")
+    except httpx.HTTPError as exc:
+        return HttpResult.failure(f"network error: {exc.__class__.__name__}: {exc}")
+
+    if resp.status_code >= 400:
+        return HttpResult.failure(
+            f"HTTP {resp.status_code} from {resp.request.url.host}", status=resp.status_code
+        )
+    body = resp.content
+    if len(body) > max_bytes:
+        return HttpResult.failure(
+            f"response was {len(body)} bytes, over the {max_bytes} byte limit",
+            status=resp.status_code,
+        )
+    return HttpResult(ok=True, status=resp.status_code, data=body)
 
 
 def post_text(
