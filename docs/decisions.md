@@ -43,22 +43,48 @@ attention, a missed one costs more.
 
 ---
 
-## 3. Strands `Graph` and `Swarm` are not used; the topology is explicit
+## 3. The forward pass is a Strands `Graph`; resume is not
 
-**Decision.** `agent/graph.py` runs the brief's topology in plain Python: the
-same nodes, the same conditional retry edge from `geolocate` back to `extract`,
-the same dedupe/match handback, the same halting gate. Strands `Agent`, `@tool`
-and the typed hook system are used throughout.
+**Decision.** `agent/forward_graph.py` builds a real `strands.multiagent.Graph`
+for `extract -> geolocate -> dedupe -> triage -> match -> gate`. Every arrow is a
+`GraphEdge`, the retry from `geolocate` back to `extract` is a genuine cycle with
+a condition on it, and the dedupe/match handback is another. `gate` has no
+outgoing edges, so a run that raises a `DecisionCard` terminates there.
 
-**Why.** The models available on this machine (`deepseek-r1:7b`, `phi3:mini`)
-advertise `completion` only — neither supports tool calling. Strands' Graph and
-Swarm orchestrate agents that call tools; with these models they would be
-orchestrating nothing. Building them anyway would have produced an impressive
-call graph that could not actually run.
+`Pipeline.resume_after_decision` is **not** a graph, and that is the considered
+part of this decision.
 
-**Cost, stated plainly.** This gives up model-driven tool use, which the brief
-values. `agent/tools/` is written and registered as real `@tool` functions, so
-setting `MODEL_PROVIDER=bedrock` or `anthropic` makes that path live.
+**Why the split.** Human-in-the-loop is inherently multi-invocation. A
+coordinator may answer in ten seconds or in ten minutes, from a different
+process, after a restart. Expressing "wait for a human" inside a graph run would
+mean a node blocking while holding the pipeline lock, a worker thread and an open
+store connection — and would put the one code path that can reach `roster.assign`
+behind a second layer of orchestration. The halt is what makes the gate safe to
+hold, so the halt is modelled as the graph ending rather than as the graph
+waiting. Resume re-enters at `match` with the coordinator's answer in state.
+
+**What this replaced.** Until this change the topology ran as explicit Python and
+this section argued that Strands' multi-agent primitives could not be used,
+because the local models available (`deepseek-r1:7b`, `phi3:mini`) advertise
+completion only and Graph orchestrates *agents that call tools*. That reasoning
+was sound and is now obsolete: with a tool-calling provider configured
+(§18) there are real tool-calling agents to orchestrate, so the topology moved
+onto the SDK.
+
+**The check that it stayed honest.** `scripts/e2e.py --no-model` produces
+byte-identical output before and after the move, and `test_forward_graph.py`
+pins the visit order for every branch — the straight line, one retry, two
+retries, a duplicate at either dedupe pass, and the conflict handback — against
+the real `Graph`, plus a guard that fails if `gate` ever gains an outgoing edge.
+
+**Cost, stated plainly.** A cyclic graph has no natural termination count, so
+`set_max_node_executions(24)` is a backstop against a future edit breaking one
+of the two loop conditions. The SDK marks an over-budget run `FAILED` and returns
+quietly rather than raising, which would leave a request stuck in `processing`
+with nothing to answer, so `run_forward` turns that into an exception. `Swarm` is
+still not used: this pipeline is a fixed sequence with two conditional edges, and
+handing that to a self-organising swarm would replace a topology a coordinator
+can read with one they cannot.
 
 ---
 
@@ -262,3 +288,44 @@ three-column layout was what got looked at.
 Each column now has an explicit minimum height below the breakpoint, and the
 queue -- the thing the console is for -- gets the most room and stays first in
 source order.
+
+---
+
+## 18. The model chooses the tools; Python still owns the numbers
+
+**Decision.** With `MODEL_PROVIDER=bedrock` or `anthropic`, `extract`,
+`geolocate` and `triage` run a real `strands.Agent` with `@tool` functions bound
+to it, and the model decides which to call. `agent/tool_agent.py` is the only
+place such an agent is built, and it always attaches the same three hooks:
+`HumanGateHook`, `AuditLogHook`, `PIIRedactionHook`.
+
+**Why this needed saying out loud.** Before it, every `@tool` function in this
+repository was decorated as a tool and then called from Python around a
+completion-only model. The decoration was true and the tool use was not, which
+meant the human gate hook -- the single most important thing here -- had never
+once fired on a tool call an agent actually chose to make.
+`test_tool_agent.py` now drives a real `Agent` into `roster_assign` over a
+scripted model and asserts the refusal happens *before* the tool body runs, with
+no provider, no credentials and no network.
+
+**What the model is not given.** Geolocation confidence is still computed by
+`_point_from` from the candidate list the tool returned, never from the model's
+prose about it — letting the model pick *which* place to look up is useful,
+letting it pick how confident we are is not. Urgency is computed before the
+model is asked anything at all, so nothing a tool returns can move a request up
+the queue (#1). `roster_assign` is deliberately absent from the triage agent's
+tool list: the gate would refuse it anyway, but an explanation has no business
+holding a tool that dispatches a boat.
+
+**Found while wiring it.** Raising out of a `BeforeToolCallEvent` callback stops
+the tool, which is the job — but Strands wraps the exception in an
+`EventLoopException` before the caller sees it. A caller matching on
+`GateViolation` by type would therefore report the gate working correctly as a
+crash, and show the coordinator a `processing_failed` card instead of the truth.
+`caused_by_gate()` walks the cause chain, and the tests pin it.
+
+**Cost.** Two providers now differ in more than latency, so `/healthz` and the
+About screen report which one is live and whether tool-calling is active, rather
+than leaving an operator to infer it from the config. The Ollama path remains
+supported and documented, with `OLLAMA_TOOL_CALLING` for local models that do
+support tools.

@@ -1,4 +1,4 @@
-"""The pipeline graph.
+"""The pipeline: the node bodies, and what happens either side of the graph.
 
     intake -> extract -> geolocate -> dedupe -> triage -> match -> gate
                   ^          |           |
@@ -6,29 +6,29 @@
                   conf < floor,
                   once only
 
-Topology notes that matter:
+The topology above is a real `strands.multiagent.Graph`, built in
+`forward_graph.py`. This module holds the node bodies it runs, plus the two
+things that sit outside a forward pass:
+
+* **`run`** starts the graph and records what it concluded.
+* **`resume_after_decision`** is the second entry point, taken when a
+  coordinator answers a card. It is explicit, not a graph, on purpose -- see
+  `forward_graph.py` for why.
+
+Behaviour notes that matter, all of them now enforced by edge conditions rather
+than by control flow here:
 
 * **The retry edge is real.** When `geolocate` cannot place a request with
   enough confidence, control returns to `extract` once, with the failed
   candidates injected as context so the model can offer a different location
   string. A second failure routes to `gate` as a `low_confidence_location` card
   rather than looping forever.
-* **`gate` halts.** It writes a `DecisionCard` and returns. Nothing resumes
-  until a coordinator answers, at which point `resume_after_decision` re-enters
-  at `match` with their answer in state.
+* **`gate` halts.** It writes a `DecisionCard` and the graph run ends there,
+  because `gate` has no outgoing edges. Nothing resumes until a coordinator
+  answers.
 * **dedupe and match share context.** Matching can reveal a duplicate that
   dedupe missed -- two requests wanting the same boat at the same coordinates --
   so match hands back to dedupe once before the gate sees it.
-
-Implementation note, stated plainly because the brief asks for Strands `Graph`
-and `Swarm`: this build runs against local Ollama models, and neither
-`deepseek-r1:7b` nor `phi3:mini` supports tool calling. Strands' Graph and Swarm
-orchestrate *agents that call tools*, so with these models they would have
-nothing to orchestrate. The executor below therefore runs the same topology --
-same nodes, same conditional retry edge, same dedupe/match handback, same
-halting gate -- in explicit Python, and calls the model only for the language
-tasks it can actually do. Set MODEL_PROVIDER to bedrock or anthropic and the
-tool-calling path in agent/tools/ becomes live. See docs/decisions.md.
 """
 
 from __future__ import annotations
@@ -44,6 +44,7 @@ from ..models.request import HelpRequest
 from ..store.decisions_repo import DecisionsRepo
 from ..store.requests_repo import RequestsRepo
 from ..store.resources_repo import ResourcesRepo
+from .forward_graph import run_forward
 from .models import tool_calling_active
 from .nodes import dedupe, extract, gate, geolocate, match, triage
 
@@ -291,51 +292,27 @@ class Pipeline:
     # --- the graph --------------------------------------------------------
 
     def run(self, request: HelpRequest) -> RunState:
-        """One full pass: intake through gate, with the retry and duplicate edges."""
+        """One full pass: intake through gate, with the retry and duplicate edges.
+
+        The topology lives in `forward_graph.py` as a real Strands `Graph`. What
+        stays here is what a graph edge cannot express: the bookkeeping for a
+        request the graph closed as a duplicate, and the save.
+        """
         state = RunState(request=request)
         request.status = "processing"
         self._save(state)
 
-        self._run_extract(state)
+        run_forward(self, state, request)
 
-        # geolocate, with one conditional loop back to extract.
-        self._run_geolocate(state)
-        if geolocate.needs_retry(state.request.location, state.request.geo_attempts):
-            failed = state.request.need.raw_location_text if state.request.need else None
-            state.notes.append(f"retrying extraction: {failed!r} did not resolve")
-            self._run_extract(
-                state,
-                extra_context=(
-                    f"The location {failed!r} could not be resolved. Look again for a village, "
-                    f"landmark, or neighbourhood name, and return only that in raw_location_text."
-                ),
-            )
-            self._run_geolocate(state)
-
-        self._run_dedupe(state)
         if state.duplicate is not None and state.duplicate.is_duplicate:
+            # Terminal at `dedupe`: neither edge out of it was satisfied, so no
+            # node became ready and the graph ended there.
             state.request.status = "duplicate"
             state.request.duplicate_of = state.duplicate.candidate_id
-            state.notes.append(f"closed as a duplicate of {state.duplicate.candidate_id}")
+            if state.visited.count("dedupe") == 1:
+                state.notes.append(f"closed as a duplicate of {state.duplicate.candidate_id}")
             state.halted_at = "dedupe"
-            self._save(state)
-            return state
 
-        self._run_triage(state)
-        self._run_match(state)
-
-        # Match can reveal a duplicate dedupe missed: two requests pointed at the
-        # same resource from the same spot. Hand back once.
-        if state.match_result and state.match_result.has_conflict:
-            self._run_dedupe(state)
-            if state.duplicate is not None and state.duplicate.is_duplicate:
-                state.request.status = "duplicate"
-                state.request.duplicate_of = state.duplicate.candidate_id
-                state.halted_at = "dedupe"
-                self._save(state)
-                return state
-
-        self._run_gate(state)
         self._save(state)
         return state
 
