@@ -7,6 +7,8 @@ Layout
     PK=DEC#{id}            SK=META
     PK=AUDIT#{yyyy-mm-dd}  SK={ts}#{id}
     PK=GEO#{norm_query}    SK=CACHE
+    PK=GIBS#{name}         SK=CACHE
+    PK=NDMA#{report_no}    SK=CACHE
     GSI1: gsi1pk=STATUS#{status}, gsi1sk={inverted_urgency}#{id}  -- the board query
 
 Items carry their payload as a JSON string in `body`, with only the attributes
@@ -54,6 +56,14 @@ def audit_pk(day: str) -> str:
 
 def geo_pk(normalised_query: str) -> str:
     return f"GEO#{normalised_query}"
+
+
+def gibs_pk(name: str) -> str:
+    return f"GIBS#{name}"
+
+
+def ndma_pk(report_number: str) -> str:
+    return f"NDMA#{report_number}"
 
 
 def board_gsi1pk(status: str) -> str:

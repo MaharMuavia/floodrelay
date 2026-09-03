@@ -61,7 +61,33 @@ class Settings(BaseSettings):
     # west,north,east,south as Nominatim expects.
     geocode_viewbox: str = "71.65,34.15,72.30,33.85"
     open_meteo_base: str = "https://api.open-meteo.com/v1"
-    reliefweb_base: str = "https://api.reliefweb.int/v1"
+    # GloFAS river discharge. Separate host from the weather API, same provider.
+    open_meteo_flood_base: str = "https://flood-api.open-meteo.com/v1"
+    # NASA GIBS serves satellite tiles with no key and no registration. The
+    # capabilities document is ~5.8 MB, so it is cached hard -- see
+    # agent/tools/imagery_layers.py.
+    gibs_base: str = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best"
+    # NDMA publishes a daily monsoon situation report as a PDF. There is no API;
+    # the listing is scraped and the PDF parsed. See agent/tools/ndma.py.
+    ndma_base: str = "https://ndma.gov.pk"
+    # GDACS: worldwide flood alerts, keyless RSS. The only genuinely global
+    # live source here. See agent/tools/gdacs.py.
+    gdacs_rss: str = "https://www.gdacs.org/xml/rss.xml"
+    # The district and province this console coordinates, used when asking the
+    # national sitrep about "here".
+    situation_district: str = "Nowshera"
+    situation_province: str = "KP"
+    # The point satellite layers are probed at, to establish whether a layer
+    # actually serves tiles over the district being coordinated.
+    situation_lat: float = 34.0151
+    situation_lon: float = 71.9747
+    # v1 was decommissioned and answers 410 Gone. v2 additionally requires a
+    # pre-approved appname (a manual form, reviewed by email), so with none
+    # configured the tool uses the keyless RSS feed instead. See
+    # agent/tools/reliefweb.py.
+    reliefweb_base: str = "https://api.reliefweb.int/v2"
+    reliefweb_rss: str = "https://reliefweb.int/updates/rss.xml"
+    reliefweb_appname: str | None = None
 
     # --- Telemetry ---------------------------------------------------------
     otel_exporter_otlp_endpoint: str | None = None
