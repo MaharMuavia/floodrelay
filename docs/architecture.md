@@ -3,9 +3,10 @@
 ![FloodRelay pipeline](architecture.svg)
 
 SVG rather than PNG: it is vector, renders on GitHub, and is a fraction of
-the size. Rasterising the mermaid source below would have needed a
-headless-Chromium download this machine's ~50 KB/s link could not justify.
-The mermaid source is kept as the machine-readable description.
+the size. The mermaid source below is kept as the machine-readable description,
+and the two run through a real `strands.multiagent.Graph` — every edge in the
+flowchart is a `GraphEdge`, the `geolocate → extract` loop is a real cycle, and
+`gate` is terminal so the run ends when a card is written.
 
 ## The pipeline
 
@@ -22,10 +23,10 @@ flowchart LR
   BULK --> INTAKE
 
   INTAKE["intake<br/><i>pure Python</i><br/>normalise + redact PII"]
-  EXTRACT["extract<br/><i>model</i><br/>ExtractedNeed + grounding"]
-  GEO["geolocate<br/><i>model + geocode tool</i>"]
+  EXTRACT["extract<br/><i>tool-calling agent</i><br/>ExtractedNeed + grounding"]
+  GEO["geolocate<br/><i>agent chooses geocode_place</i><br/>confidence stays arithmetic"]
   DEDUPE["dedupe<br/><i>deterministic similarity</i>"]
-  TRIAGE["triage<br/><i>scoring.py computes,<br/>model explains</i>"]
+  TRIAGE["triage<br/><i>scoring.py computes,<br/>agent explains + context tools</i>"]
   MATCH["match<br/><i>nearest capable resource</i>"]
   GATE["gate<br/><i>pure Python</i><br/>four rules"]
 
@@ -88,12 +89,14 @@ service or a test cannot slip past the hook.
 
 | Layer | Where | Notes |
 |---|---|---|
-| API | `api/` | FastAPI, Pydantic v2 at every boundary, SSE at `/stream` |
-| Orchestration | `services/pipeline.py` | The only caller of `agent/graph.py`; runs on a worker thread |
-| Graph | `agent/graph.py` | Node sequence, retry edge, handback, halting gate |
+| API | `api/` | FastAPI, Pydantic v2 at every boundary, SSE at `/stream`, AgentCore contract at `/invocations` + `/ping` |
+| Orchestration | `services/pipeline.py` | Runs the forward graph on a worker thread; the only caller either side of it |
+| Graph | `agent/forward_graph.py` | A real `strands.multiagent.Graph`: six nodes, the retry cycle and handback as conditional edges, `gate` terminal |
+| Node bodies + resume | `agent/graph.py` | The `_run_*` steps the graph executes, plus `resume_after_decision` (explicit, not a graph — see `decisions.md` §3) |
+| Tool-calling agent | `agent/tool_agent.py` | Builds a `strands.Agent` over the `@tool` functions, always with the gate/audit/PII/trace hooks |
 | Nodes | `agent/nodes/` | One module each, a `run` function, no hidden state |
 | Tools | `agent/tools/` | `@tool`-decorated, typed failure returns, explicit timeouts |
-| Hooks | `agent/hooks/` | `human_gate`, `pii_redaction`, `audit_log` |
+| Hooks | `agent/hooks/` | `human_gate`, `pii_redaction`, `audit_log` (a `HookProvider` each) |
 | Determinism | `services/scoring.py`, `geo.py`, `conflict.py` | Pure functions, table-tested |
 | Store | `store/` | Single table, two backends (memory, DynamoDB) |
 
