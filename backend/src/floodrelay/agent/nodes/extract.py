@@ -22,7 +22,7 @@ from typing import Any
 
 from ...models.common import Confidence
 from ...models.request import ExtractedNeed, NeedKind
-from ._llm import complete_json, load_prompt
+from ._llm import complete_json, complete_json_with_tools, load_prompt, tools_are_live
 
 VALID_KINDS: tuple[NeedKind, ...] = ("rescue", "medical", "food_water", "shelter", "other")
 
@@ -63,6 +63,26 @@ _OFFER_TERMS = (
     "volunteer", "ready for distribution", "how can our", "on behalf of",
     "register as", "i am an", "our organisation has",
 )
+
+
+# Appended to the extract prompt only when the provider can actually tool-call.
+# Kept out of prompts/extract.md so that the file a reviewer reads is the prompt
+# a completion-only model gets, with no instructions about tools it cannot use.
+_TOOL_GUIDANCE = """
+## Checking the location
+
+You have a `geocode_place` tool. Before you answer, call it once with the place
+name you are about to put in `raw_location_text`.
+
+- If it returns candidates, keep that name.
+- If it returns none, look again at the message for a different village,
+  landmark or neighbourhood and try that instead.
+- If nothing in the message resolves, set `raw_location_text` to the best place
+  name the message actually contains. Do not invent one, and do not put
+  coordinates there.
+
+Call the tool at most twice. Then reply with the JSON object and nothing else.
+"""
 
 
 def _fold(text: str) -> str:
@@ -222,14 +242,43 @@ def normalise(raw: dict[str, Any], message: str) -> tuple[ExtractedNeed, list[st
     return need, notes
 
 
-def run(message: str, *, extra_context: str | None = None) -> tuple[ExtractedNeed, str]:
-    """Extract a need from one message. Returns the need and the raw model reply."""
+def run(
+    message: str,
+    *,
+    extra_context: str | None = None,
+    request_id: str | None = None,
+    trace_id: str | None = None,
+) -> tuple[ExtractedNeed, str]:
+    """Extract a need from one message. Returns the need and the raw model reply.
+
+    With a tool-calling provider the model is handed `geocode_place` and told to
+    check its own answer: a `raw_location_text` that resolves to nothing is a
+    location string the pipeline cannot use, and the model is in a far better
+    position to offer a different one from the message than the retry edge is.
+    Nothing the model says about the geocoder is trusted -- `geolocate` resolves
+    the string again through the same cached function -- but a string that has
+    been checked once is a better string.
+    """
     system = load_prompt("extract")
     user = f"Message: {message}\n\nJSON:"
     if extra_context:
         user = f"{user}\n\nAdditional context: {extra_context}"
 
-    parsed, raw = complete_json(system, user, role="light")
+    if tools_are_live():
+        from ..tools.geocode import geocode_place
+
+        parsed, raw, _trace = complete_json_with_tools(
+            f"{system}\n{_TOOL_GUIDANCE}",
+            user,
+            tools=[geocode_place],
+            role="light",
+            request_id=request_id,
+            trace_id=trace_id,
+            node="extract",
+        )
+    else:
+        parsed, raw = complete_json(system, user, role="light")
+
     if parsed is None:
         # The pipeline continues with a low-confidence shell rather than
         # dropping the request: an unparsed message still needs a human.

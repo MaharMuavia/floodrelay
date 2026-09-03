@@ -38,11 +38,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..models.common import GeoPoint
 from ..models.decision import DecisionCard
 from ..models.request import HelpRequest
 from ..store.decisions_repo import DecisionsRepo
 from ..store.requests_repo import RequestsRepo
 from ..store.resources_repo import ResourcesRepo
+from .models import tool_calling_active
 from .nodes import dedupe, extract, gate, geolocate, match, triage
 
 Emit = Callable[[dict[str, Any]], None]
@@ -127,7 +129,12 @@ class Pipeline:
     def _run_extract(self, state: RunState, extra_context: str | None = None) -> None:
         started = self._start(state, "extract")
         if self.use_model:
-            need, _raw = extract.run(state.request.raw_text, extra_context=extra_context)
+            need, _raw = extract.run(
+                state.request.raw_text,
+                extra_context=extra_context,
+                request_id=state.request.id,
+                trace_id=state.request.trace_id,
+            )
         else:
             need, _notes = extract.normalise({"kind": "other"}, state.request.raw_text)
         state.request.need = need
@@ -140,12 +147,34 @@ class Pipeline:
         started = self._start(state, "geolocate")
         state.request.geo_attempts += 1
         location_text = state.request.need.raw_location_text if state.request.need else None
-        if location_text:
-            self._tool(state.request.id, "geocode", f'Resolving "{location_text}"')
 
-        point, summary = geolocate.run(
-            state.request.raw_text, location_text, attempt=state.request.geo_attempts
-        )
+        point: GeoPoint | None = None
+        summary = ""
+        placed_by_agent = False
+
+        if self.use_model and tool_calling_active():
+            point, summary, calls = geolocate.run_with_agent(
+                state.request.raw_text,
+                location_text,
+                attempt=state.request.geo_attempts,
+                request_id=state.request.id,
+                trace_id=state.request.trace_id,
+            )
+            for call in calls:
+                self._tool(state.request.id, call.name, call.summary())
+            placed_by_agent = point is not None
+
+        if not placed_by_agent:
+            # Either the provider cannot tool-call, or the model chose nothing
+            # useful. Resolving the extracted string deterministically is what
+            # this node has always done and is strictly better than giving up:
+            # an unplaced request goes to a human for no good reason.
+            if location_text:
+                self._tool(state.request.id, "geocode", f'Resolving "{location_text}"')
+            point, summary = geolocate.run(
+                state.request.raw_text, location_text, attempt=state.request.geo_attempts
+            )
+
         state.request.location = point
         state.notes.append(summary)
         self._done(
@@ -170,7 +199,12 @@ class Pipeline:
 
     def _run_triage(self, state: RunState) -> None:
         started = self._start(state, "triage")
-        urgency, _breakdown, explanation = triage.run(state.request, use_model=self.use_model)
+        urgency, _breakdown, explanation = triage.run(
+            state.request,
+            use_model=self.use_model,
+            request_id=state.request.id,
+            trace_id=state.request.trace_id,
+        )
         state.request.urgency = urgency
         state.explanation = explanation
         self._done(state, "triage", started, {"urgency": urgency})

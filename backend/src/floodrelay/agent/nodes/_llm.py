@@ -3,6 +3,13 @@
 Prompts live in agent/prompts/*.md and are loaded at runtime, so they are
 version-controlled and reviewable as text rather than buried in f-strings.
 
+Two shapes of call live here. `complete`/`complete_json` are the completion-only
+path: one turn, no tools, for a provider that cannot tool-call. `complete_json_with_tools`
+is the same parsing policy wrapped around a real tool-calling agent, where the
+model is handed `@tool` functions and decides for itself which to call. Which one
+a node uses is decided by `tool_calling_active()`, never by a per-node flag, so
+switching provider switches every node at once.
+
 `complete_json` is deliberately tolerant on input and strict on output. Small
 local models wrap JSON in prose, add code fences, emit trailing commas, and
 sometimes think out loud first. None of that should take the pipeline down, so
@@ -17,7 +24,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from ..models import Role, get_model
+from ..models import Role, get_model, tool_calling_active
+from ..tool_agent import ToolTraceHook, run_agent
 
 PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -136,3 +144,58 @@ def complete_json(
     )
     raw2 = complete(system, retry_user, role=role)
     return extract_json_object(raw2), raw2
+
+
+def complete_json_with_tools(
+    system: str,
+    user: str,
+    *,
+    tools: list[Any],
+    role: Role = "light",
+    retries: int = 1,
+    request_id: str | None = None,
+    trace_id: str | None = None,
+    node: str | None = None,
+) -> tuple[dict[str, Any] | None, str, ToolTraceHook]:
+    """Ask a tool-calling agent for JSON. Same parsing policy as `complete_json`.
+
+    Returns (parsed_or_None, raw_text, trace). The trace is what the model
+    actually called, and the nodes read their numbers out of it rather than out
+    of the prose -- a model that says "I geocoded it to Nowshera" has not
+    geocoded anything the pipeline can use.
+    """
+    raw, trace = run_agent(
+        role=role,
+        tools=tools,
+        system_prompt=system,
+        user=user,
+        request_id=request_id,
+        trace_id=trace_id,
+        node=node,
+    )
+    parsed = extract_json_object(raw)
+    if parsed is not None or retries <= 0:
+        return parsed, raw, trace
+
+    retry_user = (
+        f"{user}\n\nYour previous reply could not be parsed as JSON. "
+        f"Reply with the JSON object only. No prose, no code fence."
+    )
+    raw2, trace2 = run_agent(
+        role=role,
+        tools=tools,
+        system_prompt=system,
+        user=retry_user,
+        request_id=request_id,
+        trace_id=trace_id,
+        node=node,
+    )
+    # Keep the first turn's calls: the retry is about output format, and the
+    # tools it already ran are still what the node has to reason from.
+    trace2.calls = trace.calls + trace2.calls
+    return extract_json_object(raw2), raw2, trace2
+
+
+def tools_are_live() -> bool:
+    """Re-exported so nodes ask one question in one place."""
+    return tool_calling_active()

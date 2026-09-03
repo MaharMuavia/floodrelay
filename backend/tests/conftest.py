@@ -14,8 +14,16 @@ import pytest
 
 # Set before any floodrelay import so Settings picks these up.
 os.environ.setdefault("DDB_ENDPOINT", "memory")
-# Unit tests never construct a model; the provider is irrelevant here.
 os.environ.setdefault("DEMO_MODE", "true")
+
+# Pinned rather than defaulted, and pinned over whatever backend/.env says.
+# The provider now decides which code path the nodes take -- a tool-calling
+# provider hands the model `@tool` functions, a completion-only one does not --
+# so a suite that inherited the developer's provider would test a different
+# thing on every machine. Tests that need the tool-calling path build it
+# explicitly with a mocked model; see test_tool_agent.py.
+os.environ["MODEL_PROVIDER"] = "ollama"
+os.environ["OLLAMA_TOOL_CALLING"] = "false"
 
 from floodrelay.models import (
     Confidence,

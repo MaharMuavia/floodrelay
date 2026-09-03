@@ -9,6 +9,13 @@ That indirection is not architectural taste. Bedrock refuses Anthropic models by
 connection origin from some countries, Nova has no such gate, and a laptop on a
 bad link may need to fall back to a local Ollama model. All three are one
 `MODEL_PROVIDER=` away.
+
+The provider also decides something larger than which weights answer, and
+`tool_calling_active()` is where that is named. A provider that can run a
+tool-calling loop gets the `@tool` functions handed to it and chooses for
+itself; one that cannot has the same functions called from Python around it.
+Both are honest configurations, and `/healthz` says which is live rather than
+leaving an operator to infer it.
 """
 
 from __future__ import annotations
@@ -38,6 +45,21 @@ def model_id_for(role: Role, settings: Settings | None = None) -> str:
     if s.model_provider == "anthropic":
         return s.anthropic_model_heavy if role == "heavy" else s.anthropic_model_light
     return s.ollama_model_heavy if role == "heavy" else s.ollama_model_light
+
+
+def tool_calling_active(settings: Settings | None = None) -> bool:
+    """Whether the configured provider can actually run a tool-calling loop.
+
+    This is what decides whether the nodes hand the model a set of `@tool`
+    functions and let it choose, or fall back to calling those functions from
+    Python around a completion-only model. It is reported by /healthz and the
+    About screen rather than inferred, because "the agent used its tools" is a
+    claim a coordinator should be able to check.
+    """
+    s = settings or get_settings()
+    if s.model_provider in ("bedrock", "anthropic"):
+        return True
+    return s.ollama_tool_calling
 
 
 def get_model(role: Role, settings: Settings | None = None) -> Model:
@@ -111,8 +133,19 @@ def get_model(role: Role, settings: Settings | None = None) -> Model:
 def describe_models(settings: Settings | None = None) -> dict[str, str]:
     """What /healthz and the About screen report, without constructing anything."""
     s = settings or get_settings()
+    active = tool_calling_active(s)
     return {
         "provider": s.model_provider,
         "heavy": model_id_for("heavy", s),
         "light": model_id_for("light", s),
+        "tool_calling": "active" if active else "inactive",
+        "tool_calling_detail": (
+            "the model chooses and calls the @tool functions itself"
+            if active
+            else (
+                f"provider {s.model_provider!r} is configured as completion-only, so the "
+                f"tools are called from Python around the model; set "
+                f"OLLAMA_TOOL_CALLING=true if the configured model does support tools"
+            )
+        ),
     }

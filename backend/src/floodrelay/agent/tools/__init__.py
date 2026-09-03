@@ -6,7 +6,7 @@ loop: a failure is a value the model can reason about.
 """
 
 from .gdacs import global_flood_alerts
-from .geocode import GeocodeResult, parse_coordinates, resolve
+from .geocode import GeocodeResult, geocode_place, parse_coordinates, resolve
 from .imagery import score_photo, vision_available
 from .imagery_layers import available_layers
 from .ndma import situation as ndma_situation
@@ -22,6 +22,7 @@ __all__ = [
     "available_layers",
     "compute_routes",
     "find_places",
+    "geocode_place",
     "global_flood_alerts",
     "heatmap",
     "ndma_situation",

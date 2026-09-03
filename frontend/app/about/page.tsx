@@ -18,6 +18,8 @@ export default function AboutPage() {
   const checks = (health.data?.checks ?? {}) as Record<string, unknown>;
   const photo = String(checks.photo_severity ?? "");
   const visionOff = photo.startsWith("unavailable");
+  const toolCallingOn = health.data?.models.tool_calling === "active";
+  const toolCallingDetail = health.data?.models.tool_calling_detail ?? "";
 
   return (
     <div className="mx-auto max-w-[80ch] px-6 py-8">
@@ -152,9 +154,16 @@ export default function AboutPage() {
           <Row label="Model provider" value={health.data?.models.provider ?? "…"} />
           <Row label="Reasoning model" value={health.data?.models.heavy ?? "…"} />
           <Row label="Extraction model" value={health.data?.models.light ?? "…"} />
+          <Row label="Tool calling" value={health.data?.models.tool_calling ?? "…"} />
           <Row label="Photo severity" value={photo || "…"} />
           <Row label="Tracing" value={String(checks.tracing ?? "…")} />
         </dl>
+        <p className="mt-3 text-ink-muted">
+          {toolCallingOn
+            ? "The agent chooses its own tools: it decides when to geocode, when to check rainfall or river level, and what to look up before explaining a score. Every one of those calls goes through the same hook that refuses a dispatch without your approval."
+            : toolCallingDetail ||
+              "The configured model cannot call tools, so the pipeline calls them from Python around it."}
+        </p>
       </Section>
     </div>
   );

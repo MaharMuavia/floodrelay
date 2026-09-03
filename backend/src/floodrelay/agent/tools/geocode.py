@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from typing import Any
 
 from pydantic import Field
+from strands import tool
 
 from ...config import get_settings
 from ...models.common import GeoCandidate, Strict
@@ -183,3 +185,43 @@ def warm_cache(queries: list[str]) -> dict[str, int]:
         else:
             stats["resolved"] += 1
     return stats
+
+
+@tool
+def geocode_place(query: str) -> dict[str, Any]:
+    """Resolve a village, landmark or neighbourhood name to coordinates.
+
+    Prefer this over guessing. Results are ranked with places inside the district
+    being coordinated first, because several villages here share a name across
+    districts and a wrong district is a wrong dispatch.
+
+    Args:
+        query: The place name exactly as it appears in the message, with no
+            surrounding description. "Kheshgi Payan", not "Kheshgi Payan, water
+            is rising".
+
+    Returns:
+        A dict with `candidates` (label, lat, lon, in_district), `count`, and
+        `cached`. An unreachable geocoder returns `available: false` with an
+        `error` string rather than raising -- a failure is a value you can
+        reason about, not the end of the run.
+    """
+    result = resolve(query)
+    if not result.ok:
+        return {"available": False, "query": result.query, "error": result.error}
+
+    return {
+        "available": True,
+        "query": result.query,
+        "cached": result.cached,
+        "count": len(result.candidates),
+        "candidates": [
+            {
+                "label": c.label,
+                "lat": c.lat,
+                "lon": c.lon,
+                "in_district": in_district(c.lat, c.lon),
+            }
+            for c in result.candidates
+        ],
+    }

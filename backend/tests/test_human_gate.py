@@ -14,6 +14,7 @@ from conftest import make_request
 from floodrelay.agent.hooks.human_gate import (
     DISPATCH_CLASS_TOOLS,
     GateViolation,
+    caused_by_gate,
     enforce_gate,
     is_dispatch_class,
 )
@@ -227,3 +228,36 @@ def test_the_gate_does_not_dispatch_anything_by_itself(
         decisions=decisions_repo,
     )
     assert requests_repo.require("r_03").status == "matched"
+
+
+# --- telling a refusal apart from a crash ----------------------------------
+#
+# Raising out of a BeforeToolCallEvent callback is what stops the tool, but the
+# Strands event loop wraps whatever the hook raised before the caller sees it.
+# Without `caused_by_gate`, the console would report the gate doing its job as
+# "processing failed" -- the same amber card as an unreachable model.
+
+
+def test_a_wrapped_violation_is_still_recognised_as_the_gate() -> None:
+    inner = GateViolation("roster_assign blocked: decision card d_1 is still open.")
+    try:
+        try:
+            raise inner
+        except GateViolation as exc:
+            raise RuntimeError("event loop cycle failed") from exc
+    except RuntimeError as outer:
+        assert caused_by_gate(outer) is inner
+
+
+def test_an_ordinary_failure_is_not_mistaken_for_the_gate() -> None:
+    assert caused_by_gate(ConnectionError("dynamodb unreachable")) is None
+    assert caused_by_gate(None) is None
+
+
+def test_a_self_referential_cause_chain_terminates() -> None:
+    """A malformed chain must not hang the console."""
+    first = RuntimeError("a")
+    second = RuntimeError("b")
+    first.__cause__ = second
+    second.__cause__ = first
+    assert caused_by_gate(first) is None

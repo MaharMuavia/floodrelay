@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     ollama_model_heavy: str = "qwen2.5:7b"
     ollama_model_light: str = "qwen2.5:7b"
+    # Whether the configured Ollama models can actually tool-call. Off by
+    # default because the small local models this was developed against
+    # (phi3:mini, deepseek-r1:7b) advertise completion only, and claiming
+    # tool-calling that does not work is worse than not claiming it. Models
+    # that do support tools -- qwen2.5, llama3.1, mistral-nemo -- turn it on.
+    ollama_tool_calling: bool = False
 
     # --- Storage -----------------------------------------------------------
     ddb_table: str = "floodrelay"

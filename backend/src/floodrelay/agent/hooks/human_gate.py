@@ -45,6 +45,27 @@ def is_dispatch_class(tool_name: str) -> bool:
     return tool_name in DISPATCH_CLASS_TOOLS
 
 
+def caused_by_gate(exc: BaseException | None) -> GateViolation | None:
+    """Find a `GateViolation` anywhere in an exception's cause chain.
+
+    Raising out of a `BeforeToolCallEvent` callback stops the tool -- which is
+    the whole job -- but the Strands event loop wraps whatever came out of the
+    hook in an `EventLoopException` before the caller sees it. So a caller that
+    catches `GateViolation` by type would report "the run failed" for what is
+    actually the system working exactly as designed.
+
+    This is how the pipeline, the audit trail and the tests tell the two apart.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        if isinstance(current, GateViolation):
+            return current
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return None
+
+
 def enforce_gate(
     tool_name: str,
     tool_input: dict[str, Any] | None,

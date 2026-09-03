@@ -94,6 +94,19 @@ def create_app() -> FastAPI:
         checks["tracing"] = getattr(app.state, "tracing", "unknown")
         checks["stream_subscribers"] = get_bus().subscriber_count
 
+        # Whether a Strands Agent is choosing and calling the @tool functions,
+        # or the pipeline is calling them from Python around a completion-only
+        # model. Reported rather than assumed: it is the difference between two
+        # genuinely different systems and an operator should not have to read
+        # the config to find out which one they are running.
+        from .agent.models import tool_calling_active
+
+        checks["tool_calling"] = (
+            "active: the model chooses and calls tools"
+            if tool_calling_active()
+            else "inactive: tools are called from Python around the model"
+        )
+
         from .agent.tools.imagery import vision_available
 
         checks["photo_severity"] = (
