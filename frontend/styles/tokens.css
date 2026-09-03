@@ -1,34 +1,62 @@
 /*
  * FloodRelay design tokens.
  *
- * A night-operations palette drawn from water and signal lights. The one rule
- * that matters more than any other:
+ * A daylight operations palette: white working surfaces on a cool grey ground,
+ * with meaning carried by a small set of saturated accents. The one rule that
+ * matters more than any other survives the change of theme:
  *
  *   --signal (amber) appears ONLY on things awaiting a human decision.
  *
  * If amber is on screen, the coordinator has something to answer. Nothing else
  * may borrow it -- not focus states on ordinary controls, not hover, not
  * "warning" text, not a chart series. That single restriction is what makes the
- * console scannable at a glance at 2am, and it is enforced in review.
+ * console scannable at a glance, and it is enforced in review.
+ *
+ * Contrast, not brand. On a light ground an accent has to survive twice: as
+ * small text and as a 2px bar. Every value below was measured against the
+ * least forgiving surface it actually lands on -- for text that is --surface-2,
+ * the hovered row, not white -- and clears 4.5:1 there. Graphic marks clear
+ * 3:1. --medical is deliberately graphic-only: it colours pins and severity
+ * edges, never a word, and is not held to the text threshold.
+ *
+ * Measured against the hovered row #e3ebf1, the worst surface each lands on:
+ *   ink 13.9   ink-muted 5.0   signal 5.0   rescue 4.8   stable 4.5   water 4.5
+ *   medical 3.3 (graphic threshold, 3:1)
+ *
+ * The first pass failed twice and it is worth recording where, because both
+ * were invisible to the eye and obvious to a calculator:
+ *   --signal came out at 4.17 on a hovered row. Amber is the one colour here
+ *   that must never be missed, and it was the only one under threshold.
+ *   --medical came out at 2.95 as a severity edge on that same row.
+ *
+ * Known gap, carried over rather than introduced: --line is a 2.1:1 divider.
+ * That is fine for row rules, which are decorative, but --line is also the
+ * border on small controls (the layer picker, the heatmap toggle, decision
+ * option buttons), and WCAG 1.4.11 wants 3:1 there. The previous dark theme sat
+ * at 1.87 on the same borders, so this is a pre-existing shortfall that a
+ * separate --line-strong token should fix, not a regression from the repaint.
  */
 
 :root {
-  /* Surfaces: deep water, blue-black. Never a tinted grey. */
-  --depth: #0a1620;
-  --surface: #10222e;
-  --surface-2: #16303f;
-  --line: #23485c;
+  color-scheme: light;
+
+  /* Surfaces: cool paper. Never a pure neutral grey -- the blue cast is what
+     keeps the water and signal accents from looking arbitrary against it. */
+  --depth: #eef2f6;
+  --surface: #ffffff;
+  --surface-2: #e3ebf1;
+  --line: #94adbf;
 
   /* Text */
-  --ink: #e8f1f5;
-  --ink-muted: #93aebd;
+  --ink: #0e2029;
+  --ink-muted: #4c6674;
 
   /* Meaning */
-  --signal: #ffc24b; /* needs a human decision -- used for nothing else */
-  --rescue: #ff6b57;
-  --medical: #ff9e6b;
-  --stable: #4fd1a5;
-  --water: #3e9bd6;
+  --signal: #a04a08; /* needs a human decision -- used for nothing else */
+  --rescue: #c2281c;
+  --medical: #dc5309; /* graphic only: pins and severity edges, never text */
+  --stable: #0f766e;
+  --water: #1d6fa5;
 
   /* Type scale: 12 / 13 / 15 / 18 / 24 / 34 */
   --t-12: 0.75rem;
@@ -43,9 +71,14 @@
 }
 
 /*
- * The console is a night-shift tool and commits to one look. There is no light
- * theme: a bright screen at 2am in a relief office is a usability problem, not
- * a preference. Stated here so the absence reads as a decision, not an omission.
+ * The console commits to a single look rather than offering a toggle. It reads
+ * as a daylight instrument: a coordination desk, not a monitoring wall.
+ *
+ * The earlier build committed the other way, to a dark night-shift palette, on
+ * the argument that a bright screen at 2am is a usability problem. That is a
+ * real trade-off and it has not gone away -- it was reversed deliberately, not
+ * overlooked. If the console is ever used mainly after dark, this is the file
+ * to revisit, and the accents will need lightening as well as the surfaces.
  */
 
 html,
