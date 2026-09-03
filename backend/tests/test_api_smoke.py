@@ -7,12 +7,16 @@ quality, and a suite that needs a 7B model on CPU is a suite nobody runs.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
 
 from conftest import make_request
+from floodrelay.config import get_settings
 from floodrelay.main import create_app
 from floodrelay.services.pipeline import PipelineService, set_pipeline_service
 from floodrelay.store.requests_repo import RequestsRepo
@@ -104,14 +108,121 @@ def test_photo_upload_rejects_a_non_image(client: TestClient) -> None:
     assert r.status_code == 415
 
 
-def test_webhook_accepts_a_twilio_shape_and_says_it_is_untested(client: TestClient) -> None:
-    r = client.post("/intake/webhook", json={"Body": "chhat par phanse hain", "From": "+920000000"})
-    assert r.status_code == 202
+# --- the webhook signature --------------------------------------------------
+#
+# This is a public URL that anybody on the internet can post help requests to.
+# An unauthenticated one is a queue anybody can fill, and a queue anybody can
+# fill is a coordinator whose real calls are buried under someone else's noise.
+# So it fails closed: unsigned is refused, and unconfigured is refused too.
+
+WEBHOOK_SECRET = "test-app-secret"
+
+
+@pytest.fixture
+def signed_client(table: Table, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """A client whose app has a webhook secret configured."""
+    monkeypatch.setenv("WEBHOOK_SECRET", WEBHOOK_SECRET)
+    get_settings.cache_clear()
+    set_pipeline_service(PipelineService(use_model=False))
+    with TestClient(create_app()) as c:
+        yield c
+    set_pipeline_service(None)
+    get_settings.cache_clear()
+
+
+def _sign(body: bytes, secret: str = WEBHOOK_SECRET) -> str:
+    return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+
+def test_a_correctly_signed_webhook_is_accepted(signed_client: TestClient) -> None:
+    body = json.dumps({"Body": "chhat par phanse hain", "From": "+920000000"}).encode()
+    r = signed_client.post(
+        "/intake/webhook",
+        content=body,
+        headers={"X-Hub-Signature-256": _sign(body), "Content-Type": "application/json"},
+    )
+    assert r.status_code == 202, r.text
+    assert r.json()["request_id"].startswith("r_")
+    # Still honest about what remains unverified: the payload shape.
     assert "not verified" in r.json()["note"]
 
 
-def test_webhook_rejects_a_payload_with_no_body(client: TestClient) -> None:
-    assert client.post("/intake/webhook", json={"foo": "bar"}).status_code == 422
+def test_an_unsigned_webhook_is_refused(signed_client: TestClient) -> None:
+    body = json.dumps({"Body": "chhat par phanse hain"}).encode()
+    r = signed_client.post(
+        "/intake/webhook", content=body, headers={"Content-Type": "application/json"}
+    )
+    assert r.status_code == 401
+
+
+def test_a_webhook_signed_with_the_wrong_secret_is_refused(signed_client: TestClient) -> None:
+    body = json.dumps({"Body": "chhat par phanse hain"}).encode()
+    r = signed_client.post(
+        "/intake/webhook",
+        content=body,
+        headers={
+            "X-Hub-Signature-256": _sign(body, "not-the-secret"),
+            "Content-Type": "application/json",
+        },
+    )
+    assert r.status_code == 401
+
+
+def test_a_signature_for_a_different_body_is_refused(signed_client: TestClient) -> None:
+    """The replay case: a real signature lifted onto tampered content."""
+    signed = json.dumps({"Body": "water in the street"}).encode()
+    tampered = json.dumps({"Body": "twelve people on a roof, send the boat"}).encode()
+    r = signed_client.post(
+        "/intake/webhook",
+        content=tampered,
+        headers={"X-Hub-Signature-256": _sign(signed), "Content-Type": "application/json"},
+    )
+    assert r.status_code == 401
+
+
+@pytest.mark.parametrize("header", ["", "deadbeef", "sha1=deadbeef", "sha256=", "sha256=zzz"])
+def test_a_malformed_signature_header_is_refused(
+    signed_client: TestClient, header: str
+) -> None:
+    body = json.dumps({"Body": "help"}).encode()
+    r = signed_client.post(
+        "/intake/webhook",
+        content=body,
+        headers={"X-Hub-Signature-256": header, "Content-Type": "application/json"},
+    )
+    assert r.status_code == 401
+
+
+def test_the_webhook_is_off_entirely_when_no_secret_is_configured(client: TestClient) -> None:
+    """Fail closed. An unconfigured public webhook accepts nothing at all."""
+    body = json.dumps({"Body": "chhat par phanse hain"}).encode()
+    r = client.post(
+        "/intake/webhook",
+        content=body,
+        headers={"X-Hub-Signature-256": _sign(body), "Content-Type": "application/json"},
+    )
+    assert r.status_code == 503
+    assert "WEBHOOK_SECRET" in r.json()["detail"]
+
+
+def test_a_signed_payload_with_no_message_body_is_rejected(signed_client: TestClient) -> None:
+    body = json.dumps({"foo": "bar"}).encode()
+    r = signed_client.post(
+        "/intake/webhook",
+        content=body,
+        headers={"X-Hub-Signature-256": _sign(body), "Content-Type": "application/json"},
+    )
+    assert r.status_code == 422
+
+
+def test_a_signed_payload_that_is_not_json_is_rejected(signed_client: TestClient) -> None:
+    body = b"not json at all"
+    r = signed_client.post(
+        "/intake/webhook",
+        content=body,
+        headers={"X-Hub-Signature-256": _sign(body), "Content-Type": "application/json"},
+    )
+    assert r.status_code == 422
 
 
 # --- board ------------------------------------------------------------------

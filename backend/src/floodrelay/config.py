@@ -104,6 +104,13 @@ class Settings(BaseSettings):
     # Optional shared secret for /internal/*. Unset means no check, which is
     # fine locally and is not fine on a public runtime.
     internal_token: str | None = None
+    # The app secret for POST /intake/webhook, used to verify the
+    # X-Hub-Signature-256 HMAC that WhatsApp Business sends over the raw body.
+    # Unlike INTERNAL_TOKEN this one fails *closed*: with no secret configured
+    # the route refuses every request. /internal/rescan is reached by our own
+    # scheduler; the webhook is a public URL anybody can post help requests to,
+    # and an unauthenticated one is a queue anybody can fill.
+    webhook_secret: str | None = None
     cors_origins: str = "http://localhost:3000"
 
     # Gate thresholds. Named here so the rules are auditable in one place

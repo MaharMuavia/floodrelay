@@ -22,22 +22,52 @@ every tool call; anything tagged dispatch-class raises `GateViolation` unless th
 invocation carries a resolved `DecisionCard` whose chosen option is a dispatch
 for that exact request and resource — and that card has not already been spent.
 
-`backend/tests/test_human_gate.py` exists to keep it that way. Thirteen of its
-cases assert that a dispatch does **not** happen: no card, an unresolved card, a
-"hold" answer, a card for a different request, a replayed card, and an
-unreachable datastore all raise. It is the most important test in the repository.
+Two test files exist to keep it that way, and between them they assert that a
+dispatch does **not** happen for: no card, an unresolved card, a "hold" answer, a
+card for a different request, a card for a different resource, a replayed card,
+and an unreachable datastore.
+
+- `backend/tests/test_human_gate.py` covers the rule itself.
+- `backend/tests/test_tool_agent.py` covers the rule **on the agent's own path**:
+  a real `strands.Agent`, driven by a scripted model, decides on its own to call
+  `roster_assign`, and the run is refused before the tool body is entered. That
+  is the case that actually matters — a gate that only fires when Python calls it
+  is not a gate on an autonomous agent.
 
 ---
 
-## Status: what is real, and what is not
+## Status
 
-This section is deliberately blunt. Nothing below is presented as working when
-it is not.
+### It works, and here is the shape of it
+
+An unstructured message arrives. A **Strands `Graph`** runs
+`extract → geolocate → dedupe → triage → match → gate`, with a real conditional
+cycle back to `extract` when a location will not resolve and a real handback from
+`match` to `dedupe` when two calls contend for one boat. With a tool-calling
+provider configured, the model inside `extract`, `geolocate` and `triage`
+**chooses and calls the `@tool` functions itself** — the geocoder, the rainfall
+and river gauges, the national situation report — and every one of those calls
+passes through the human gate, the audit log and the PII redactor.
+
+The gate is where it stops. `rescue`/`medical`, a doubtful location, a resource
+conflict, or an uncertain duplicate all end the graph run with a `DecisionCard`
+and wait for a person. Nothing resumes until they answer.
+
+What the model is never allowed to do is move the numbers. Urgency is computed by
+a pure function before the model is asked anything; geolocation confidence is
+computed from the candidate list the tool returned, not from the model's
+description of it.
+
+**Verification** (real output in [Verification](#verification) below): 367 tests,
+`ruff` and `mypy --strict` clean, and `scripts/e2e.py` replaying seed messages
+through the same code path the live routes use with `unapproved dispatches: 0`.
 
 ### Working and verified
 
 | Area | State |
 |---|---|
+| Strands `Graph` for the forward pass | Working — six nodes, a conditional retry cycle, the dedupe/match handback, a terminal gate; 11 topology tests |
+| Model-driven tool calling | Working — with `bedrock`/`anthropic` the model chooses and calls the `@tool` functions; the gate fires on that path, proven by 6 tests over a real `Agent` |
 | Extraction (English, Urdu, Roman Urdu) | Working against a live local model |
 | Grounding of model output | Working — counts and booleans are checked back against the message |
 | Deterministic urgency scoring | Working, 20 unit tests |
@@ -46,8 +76,10 @@ it is not.
 | Dedupe | Working, 17 unit tests |
 | Resource contention detection | Working, raised a real `resource_conflict` card in an end-to-end run |
 | Gate rules and decision cards | Working |
-| Human gate + audit + PII redaction hooks | Working |
-| REST API + SSE stream | Working, 28 smoke tests |
+| AgentCore Runtime contract | `POST /invocations` + `GET /ping` served and exercised under `MODEL_PROVIDER=bedrock`; 13 tests. Image not built — see the runbook |
+| WhatsApp webhook signature | Working — HMAC-SHA256 over the raw body, fails closed when unconfigured; 9 tests |
+| Human gate + audit + PII redaction hooks | Working — registered on every tool-calling agent, and verified firing there |
+| REST API + SSE stream | Working, 43 smoke tests |
 | Next.js console | Builds and runs; queue, map, activity feed, decision dock |
 | PII redaction | Verified end to end — names and numbers become `PERSON_1` / `CALLER_1`, inline sign-offs included; 29 tests |
 | Satellite layers (NASA GIBS) | Working against the live service — 10 layers, no API key; flood extent, true colour and IMERG rainfall drawn on the map with the published colour key |
@@ -96,33 +128,47 @@ will not show a zero.
 
 ### Not built, or built differently than the brief specified
 
-- **Model provider is Ollama, not Bedrock/Nova.** This machine had no AWS
-  credentials and a ~50 KB/s link, which makes a Bedrock setup impractical and a
-  4.7 GB model pull a 26-hour proposition. `get_model()` supports
-  `bedrock | anthropic | ollama`; switching is one environment variable.
-- **Strands `Graph` and `Swarm` are not used.** The local models available
-  (`deepseek-r1:7b`, `phi3:mini`) advertise `completion` only — neither supports
-  tool calling, and Strands' multi-agent primitives orchestrate agents that call
-  tools. `agent/graph.py` implements the same topology explicitly: same nodes,
-  the same conditional retry edge back to `extract`, the same dedupe/match
-  handback, the same halting gate. Strands `Agent`, `@tool`, and the typed hook
-  system **are** used. See `docs/decisions.md`.
+- **Strands `Swarm` is not used.** `Graph` is (see above). A swarm is for agents
+  that self-organise; this pipeline is a fixed sequence with two conditional
+  edges, and handing it to a swarm would replace a topology a coordinator can
+  read with one they cannot. See `docs/decisions.md` §3.
+- **The default `.env.example` now names a hosted provider, and this machine has
+  neither.** There are no AWS credentials here and no Anthropic key, so the
+  tool-calling path has been exercised against a scripted model in
+  `test_tool_agent.py` rather than against a live one. Set `ANTHROPIC_API_KEY`
+  and the same code runs against a real model with no other change; `/healthz`
+  reports which provider is live and whether tool-calling is active.
+- **Ollama remains supported but is no longer the headline.** The local models
+  available here (`deepseek-r1:7b`, `phi3:mini`) advertise `completion` only, so
+  under Ollama the tools are called from Python around the model.
+  `OLLAMA_TOOL_CALLING=true` turns the model-driven path on for a local model
+  that does support tools (qwen2.5, llama3.1, mistral-nemo).
 - **Photo severity is switched off.** No local model has vision. `score_photo`
   returns `available: false` with a reason and contributes *nothing* to the
   urgency score rather than inventing a number. `/healthz`, the About page and
   the request detail screen all say so.
-- **The WhatsApp webhook is untested.** `POST /intake/webhook` accepts the shape
-  a Twilio/WhatsApp Business callback posts, but has never been run against the
-  real provider. There is no signature verification.
+- **The WhatsApp webhook's payload shape is unverified.** The *signature* is
+  verified — HMAC-SHA256 over the raw body, and the route refuses everything when
+  no `WEBHOOK_SECRET` is configured. What has never run against a real WhatsApp
+  Business account is `normalise_payload`, which is written from the documented
+  format rather than an observed one. Delivery receipts are not handled.
 - **Default store is in-process memory.** DynamoDB single-table access is
   implemented and `DDB_ENDPOINT` switches to DynamoDB Local; the in-memory
   backend is what the tests and default config use. `/healthz` reports which.
-- **Not deployed.** No AgentCore Runtime deployment, no public URL, no
-  CloudWatch. OTel wiring exists and activates when `OTEL_EXPORTER_OTLP_ENDPOINT`
-  is set. `infra/agentcore/` holds a Dockerfile, a runtime config and the IAM
-  notes — written, but **never executed**: no Docker daemon and no AWS
-  credentials on the build machine, so the image has not even been built. A
-  starting point, not a proven deployment.
+- **Not deployed, but the runtime contract is met and was exercised.** Reading
+  the AgentCore HTTP protocol contract against this repo found three things the
+  original image would have failed on: no `POST /invocations`, no `GET /ping`,
+  and no ARM64 platform pin. All three are fixed and pinned by 13 offline tests,
+  and the app was run under the deployment environment
+  (`MODEL_PROVIDER=bedrock`, `DEMO_MODE=false`) serving both paths — output in
+  [`infra/agentcore/README.md`](infra/agentcore/README.md). OTel was confirmed
+  activating when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+  What did **not** happen: the image was never built, pushed, or launched.
+  Docker Desktop is installed but its Linux engine would not start here (the
+  `docker-desktop` WSL distro stays `Stopped`), and there are no AWS
+  credentials. The runbook marks every step ✅ executed, ⚠️ verified another way,
+  or ❌ not executed. No deploy is claimed.
 - **The architecture diagram is SVG, not PNG.** `docs/architecture.svg` is
   hand-drawn vector; the mermaid source in `docs/architecture.md` is kept as the
   machine-readable description. Rasterising to PNG needs a headless-Chromium
@@ -158,16 +204,36 @@ The console shows a banner saying so whenever `DEMO_MODE` is on.
 cd backend && uv sync --extra dev --extra ollama
 ```
 
-Create `backend/.env` from `.env.example`. For the local setup this build was
-verified with:
+Create `backend/.env` from `.env.example`.
+
+**For the model to call its own tools** — the configuration this is built
+around — use a hosted provider:
+
+```bash
+MODEL_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+DDB_ENDPOINT=memory
+```
+
+or `MODEL_PROVIDER=bedrock` with an AWS session. `/healthz` will report
+`"tool_calling": "active"`, and the activity feed will show the agent choosing
+tools rather than the pipeline calling them.
+
+**Offline fallback.** No key and no AWS session still works, with the tools
+called from Python around a completion-only local model:
 
 ```bash
 MODEL_PROVIDER=ollama
 OLLAMA_HOST=http://127.0.0.1:11435
 OLLAMA_MODEL_HEAVY=phi3:mini
 OLLAMA_MODEL_LIGHT=phi3:mini
+OLLAMA_TOOL_CALLING=false
 DDB_ENDPOINT=memory
 ```
+
+Set `OLLAMA_TOOL_CALLING=true` if the local model does support tools (qwen2.5,
+llama3.1, mistral-nemo) and it takes the same model-driven path as the hosted
+providers.
 
 Then:
 
@@ -194,34 +260,65 @@ that omits `\.ollama\models`, which makes it report `total blobs: 0`. Running
 
 ## Verification
 
+The suite needs **no model provider, no credentials and no network** — the
+tool-calling path is exercised against a scripted model, so `pytest` proves the
+gate fires on the agent's own path without anything configured.
+
 ```bash
 cd backend && uv run ruff check . && uv run mypy src && uv run pytest -q
 ```
 
-Last run on this machine:
+Last run on this machine, verbatim:
 
 ```
 All checks passed!                          # ruff
-Success: no issues found in 61 source files # mypy
-236 passed                                  # pytest
+Success: no issues found in 69 source files # mypy
+367 passed                                  # pytest
 ```
+
+`mypy` is clean in exactly the install documented above. `pdfplumber` is an
+optional extra, so it is listed under `ignore_missing_imports` — without that,
+`uv run mypy src` fails for anyone who did not add `--extra ndma`.
 
 ```bash
 cd frontend && npx tsc --noEmit && npm run build
 ```
 
-Both clean; five routes build.
+Both clean; five routes build (`/`, `/about`, `/audit`, `/requests/[id]`,
+`/_not-found`).
 
 ### End to end
 
 ```bash
-python scripts/e2e.py            # curated subset
-python scripts/e2e.py --full     # all 40 messages (slow on CPU models)
+cd backend && uv run python ../scripts/e2e.py             # curated subset
+cd backend && uv run python ../scripts/e2e.py --full      # all 40 messages
+cd backend && uv run python ../scripts/e2e.py --no-model  # deterministic, offline
 ```
 
 It replays seed messages through the same `PipelineService` the live routes use
 — there is no separate demo branch — and asserts that decision cards were raised
-and that **nothing was dispatched without an approved card**. Last run:
+and that **nothing was dispatched without an approved card**.
+
+Last `--no-model` run, which is the one that needs nothing configured:
+
+```
+replayed in 0.0s
+decision cards raised: 6 ['low_confidence_location', 'possible_duplicate',
+                          'low_confidence_location', 'low_confidence_location',
+                          'low_confidence_location', 'low_confidence_location']
+requests: 6
+  needs_decision  6
+
+unapproved dispatches: 0
+open decisions awaiting a human: 6
+PASSED: decisions raised, and nothing was dispatched without approval.
+```
+
+This output is **byte-identical** (bar the random request ids) before and after
+the move to a Strands `Graph` — that is how the refactor was checked, rather than
+asserted.
+
+An earlier run with the local model on, for the per-message cost:
 
 ```
 replayed in 244.2s

@@ -83,8 +83,9 @@ export default function AboutPage() {
         <ul className="list-disc space-y-1 pl-5 text-ink-muted">
           <li>No sign-in and no multi-tenancy. Anyone who can reach the console can use it.</li>
           <li>
-            The WhatsApp webhook accepts the right shape but has never been tested against a
-            real WhatsApp Business account. There is no signature verification.
+            The WhatsApp webhook verifies its signature and refuses anything unsigned, but the
+            payload shape has never been checked against a real WhatsApp Business account. It
+            is off entirely unless a secret is configured.
           </li>
           {visionOff ? (
             <li className="text-ink">

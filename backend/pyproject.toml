@@ -63,9 +63,19 @@ strict = true
 mypy_path = "src"
 packages = ["floodrelay"]
 warn_unreachable = true
-# Third-party SDKs without complete stubs.
+# Third-party SDKs without complete stubs. `pdfplumber` is here for a different
+# reason: it is an optional extra (`--extra ndma`), so in the documented install
+# it is genuinely absent and mypy would fail on an import the code already
+# guards with try/except ImportError. Naming it here keeps `uv run mypy src`
+# clean whether or not the extra is installed.
 [[tool.mypy.overrides]]
-module = ["strands.*", "strands_tools.*", "apscheduler.*", "sse_starlette.*"]
+module = [
+    "strands.*",
+    "strands_tools.*",
+    "apscheduler.*",
+    "sse_starlette.*",
+    "pdfplumber.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
