@@ -386,20 +386,33 @@ This output is **byte-identical** (bar the random request ids) before and after
 the move to a Strands `Graph` — that is how the refactor was checked, rather than
 asserted.
 
-An earlier run with the local model on, for the per-message cost:
+And the same script with the model on and **tool-calling live**
+(`qwen2.5:3b`, `OLLAMA_TOOL_CALLING=true`) — the run that exercises everything
+at once:
 
 ```
-replayed in 244.2s
-decision cards raised: 5 ['low_confidence_location', 'resource_conflict',
-                          'resource_conflict', 'low_confidence_location',
+replaying 6 messages (model=on)
+
+  r_01 -> r_c0f7593c5e   62.7s  kind=rescue  urgency=0.55  needs_decision  low_confidence_location
+  r_02 -> r_2a6375631e   85.3s  kind=rescue  urgency=0.55  needs_decision  possible_duplicate
+  r_03 -> r_31ad27472f   31.4s  kind=rescue  urgency=0.61  needs_decision  resource_conflict
+  r_10 -> r_81433b436d   29.8s  kind=rescue  urgency=0.45  needs_decision  resource_conflict
+  r_19 -> r_cef9d39787   23.3s  kind=other   urgency=0.13  closed          -
+  r_28 -> r_5cb8876e0c   30.6s  kind=rescue  urgency=0.55  needs_decision  possible_duplicate
+
+replayed in 263.0s
+decision cards raised: 5 ['low_confidence_location', 'possible_duplicate',
+                          'resource_conflict', 'resource_conflict',
                           'possible_duplicate']
 unapproved dispatches: 0
+open decisions awaiting a human: 5
 PASSED: decisions raised, and nothing was dispatched without approval.
 ```
 
-Per-message latency on this machine's CPU models runs 20-47s, with vague
-messages costing more because they trigger the geolocate retry loop. Any hosted
-provider removes that cost entirely.
+The two `resource_conflict` cards are the two rescue calls contending for the
+single boat — the case the whole gate exists for. `r_19` is the donation offer,
+correctly classified `other` and closed without asking anyone. Per-message cost
+is 23–85s on this machine's CPU; any hosted provider removes that.
 
 ---
 
