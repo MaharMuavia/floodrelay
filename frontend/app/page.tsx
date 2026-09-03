@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QueueColumn } from "@/components/board/QueueColumn";
+import { SituationPanel } from "@/components/context/SituationPanel";
 import { DecisionDock } from "@/components/decision/DecisionDock";
 import { AgentActivity } from "@/components/stream/AgentActivity";
 import { api } from "@/lib/api";
@@ -151,9 +152,15 @@ export default function BoardPage() {
     <div
       className={`flex h-screen flex-col ${pending > 0 ? "decision-active" : ""}`}
     >
+      {/* This banner used to say only "no real people". With live NDMA figures
+          and NASA imagery on screen beside it, that sentence had become
+          misleading about its own neighbours: it has to separate the synthetic
+          queue from the real situation layer, or it misdescribes both. */}
       {demo.data?.synthetic ? (
         <div className="shrink-0 border-b border-line bg-surface px-4 py-1 text-12 text-ink-muted">
-          Demo data — synthetic requests modelled on published flood reporting. No real people.
+          <span className="text-ink">Requests are synthetic</span> — modelled on published
+          flood reporting, no real people. Satellite imagery, river discharge and NDMA
+          situation figures are real and live.
         </div>
       ) : null}
 
@@ -229,8 +236,11 @@ export default function BoardPage() {
           />
         </section>
 
-        <section className="desaturate min-h-[260px] xl:min-h-0" aria-label="Agent activity">
-          <AgentActivity events={events} state={state} />
+        <section className="desaturate flex min-h-[260px] flex-col xl:min-h-0" aria-label="Situation and agent activity">
+          <SituationPanel />
+          <div className="min-h-0 flex-1">
+            <AgentActivity events={events} state={state} />
+          </div>
         </section>
       </main>
 

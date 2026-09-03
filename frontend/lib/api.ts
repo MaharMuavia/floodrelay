@@ -5,7 +5,9 @@ import type {
   Decision,
   AuditEvent,
   HeatmapCell,
+  ImageryBlock,
   RequestDetail,
+  SituationContext,
 } from "./types";
 
 export const API_BASE =
@@ -112,6 +114,18 @@ export const api = {
     request<{ removed: number; resources: number }>("/demo/reset", {
       method: "POST",
     }),
+
+  /** Real situation data. Always 200: each block reports its own availability. */
+  context: (lat?: number, lon?: number) =>
+    request<SituationContext>(
+      lat !== undefined && lon !== undefined
+        ? `/context?lat=${lat}&lon=${lon}`
+        : "/context",
+    ),
+
+  /** Satellite layer manifest for the map, kept separate so the map can draw
+   *  without waiting on a 3 MB PDF being parsed. */
+  imagery: () => request<ImageryBlock>("/context/imagery"),
 
   intake: (text: string, channel = "form") =>
     request<{ request_id: string; trace_id: string | null }>("/intake", {
