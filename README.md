@@ -355,6 +355,39 @@ explanation are now rejected in code and fall back to the deterministic sentence
 argument for a larger model. None of it moves the urgency, which stayed 0.505
 across three runs.
 
+### The whole gate, refuse to dispatch to refuse-again
+
+```bash
+cd backend && uv run python ../scripts/gate_demo.py
+```
+
+Every other demonstration shows the gate *refusing*. This walks the complete
+lifecycle on the real pipeline, so the natural question -- "then the agent can
+never actually send help?" -- gets its answer:
+
+```
+1. a rescue call arrives, and the agent stops at the gate
+   status  : needs_decision      card: life_safety
+   before approval: roster_assign is refused
+   resource res_boat_1 status: available (untouched)
+
+2. the coordinator approves this exact request and resource
+   resolving d_da75031f -> SEND ('Send Rescue boat Alpha')
+
+3. roster_assign now runs, under the approval
+   request  r_583dd4097f status: dispatched
+   resource res_boat_1   status: assigned
+   card d_da75031f consumed_by: roster_assign:r_583dd4097f
+
+4. the same approval, replayed, is refused
+   "decision card d_da75031f was already used ... One approval authorises one dispatch."
+
+PASSED.
+```
+
+Refused with no approval, allowed exactly the one the coordinator gave, refused
+the replay. The boat leaves the jetty only for the request a human named.
+
 ### End to end
 
 ```bash
