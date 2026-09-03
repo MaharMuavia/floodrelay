@@ -180,3 +180,70 @@ def test_result_never_leaves_the_unit_interval() -> None:
                      people_total=500, water_level_note="roof, rising fast")
     r = compute_urgency(need, photo_severity=1.0, received_at=FIXED_NOW, now=FIXED_NOW)
     assert 0.0 <= r.total <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# The line between context and arithmetic
+# ---------------------------------------------------------------------------
+#
+# Real satellite imagery, river discharge, NDMA damage figures and ReliefWeb
+# headlines were added to this project as *context*. Every one of them is a
+# plausible-looking number that a future change could quietly fold into the
+# urgency score, and the moment that happens urgency stops being deterministic
+# and stops being explainable to the coordinator it is shown to.
+#
+# Comments do not enforce that. These tests do.
+
+CONTEXT_SOURCES = {
+    "river",
+    "ndma",
+    "imagery",
+    "imagery_layers",
+    "reliefweb",
+    "weather",
+    "places",
+    "routing",
+}
+
+
+def test_scoring_imports_no_context_source() -> None:
+    """scoring.py must stay pure: no network, no imagery, no situation data."""
+    import ast
+    from pathlib import Path
+
+    from floodrelay.services import scoring as scoring_module
+
+    tree = ast.parse(Path(scoring_module.__file__).read_text(encoding="utf-8"))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module:
+                imported.update(node.module.split("."))
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+
+    leaked = imported & CONTEXT_SOURCES
+    assert not leaked, (
+        f"scoring.py imports context source(s) {sorted(leaked)}. Urgency must be "
+        "computable from the message alone."
+    )
+
+
+def test_compute_urgency_accepts_no_context_arguments() -> None:
+    """The signature is the contract. A `river_discharge=` parameter appearing
+    here would mean the flood layer had started moving priorities."""
+    import inspect
+
+    from floodrelay.services import scoring as scoring_module
+
+    parameters = set(inspect.signature(scoring_module.compute_urgency).parameters)
+
+    assert parameters == {"need", "raw_text", "photo_severity", "received_at", "now"}
+
+
+def test_weights_still_sum_to_one() -> None:
+    """If a context component were ever added as a weighted term, this breaks."""
+    from floodrelay.services import scoring as scoring_module
+
+    assert round(sum(scoring_module.WEIGHTS.values()), 6) == 1.0
