@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Trimmed excerpt of the live NASA GIBS EPSG:3857 WMTS capabilities document,
+fetched 2026-09-03. Structure, namespaces and attribute quoting are reproduced
+exactly as GIBS emits them (single-quoted attributes included) so the parser is
+tested against the real shape rather than a tidied-up idealisation.
+
+Four layers are kept: a daily flood product, a half-hourly precipitation
+product, a JPEG true-colour product, and a sparse SAR product. The VIIRS flood
+layers are deliberately absent so the "curated layer missing from capabilities"
+path has something to find.
+-->
+<Capabilities version='1.0.0' xmlns:gml='http://www.opengis.net/gml' xmlns:xlink='http://www.w3.org/1999/xlink' xmlns:ows='http://www.opengis.net/ows/1.1' xmlns='http://www.opengis.net/wmts/1.0' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>
+<ows:ServiceIdentification><ows:Title xml:lang='en'>NASA Global Imagery Browse Services for EOSDIS</ows:Title></ows:ServiceIdentification>
+<Contents>
+
+<Layer><ows:Title xml:lang='en'>Flood (1-Day Window, MODIS, Terra + Aqua)</ows:Title><ows:Identifier>MODIS_Combined_Flood_1-Day</ows:Identifier><Style isDefault='true'><ows:Identifier>default</ows:Identifier></Style><Dimension><ows:Identifier>Time</ows:Identifier><ows:UOM>ISO8601</ows:UOM><Default>2026-09-03</Default><Current>false</Current><Value>2021-01-01/2021-01-05/P1D</Value><Value>2023-07-26/2026-09-03/P1D</Value></Dimension><TileMatrixSetLink><TileMatrixSet>GoogleMapsCompatible_Level9</TileMatrixSet></TileMatrixSetLink><Format>image/png</Format><ResourceURL resourceType='tile' format='image/png' template='https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Combined_Flood_1-Day/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png'/><ResourceURL resourceType='Domains' format='text/xml' template='https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/MODIS_Combined_Flood_1-Day/default/{TileMatrixSet}/all/{TimeStart}.xml'/></Layer>
+
+<Layer><ows:Title xml:lang='en'>Precipitation Rate (30 min, IMERG)</ows:Title><ows:Identifier>IMERG_Precipitation_Rate_30min</ows:Identifier><Style isDefault='true'><ows:Identifier>default</ows:Identifier></Style><Dimension><ows:Identifier>Time</ows:Identifier><ows:UOM>ISO8601</ows:UOM><Default>2026-09-03T00:30:00Z</Default><Current>false</Current><Value>2026-02-11T09:00:00Z/2026-09-03T00:30:00Z/PT30M</Value></Dimension><TileMatrixSetLink><TileMatrixSet>GoogleMapsCompatible_Level6</TileMatrixSet></TileMatrixSetLink><Format>image/png</Format><ResourceURL resourceType='tile' format='image/png' template='https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/IMERG_Precipitation_Rate_30min/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png'/></Layer>
+
+<Layer><ows:Title xml:lang='en'>Corrected Reflectance (True Color, MODIS, Terra)</ows:Title><ows:Identifier>MODIS_Terra_CorrectedReflectance_TrueColor</ows:Identifier><Style isDefault='true'><ows:Identifier>default</ows:Identifier></Style><Dimension><ows:Identifier>Time</ows:Identifier><ows:UOM>ISO8601</ows:UOM><Default>2026-09-03</Default><Current>false</Current><Value>2000-02-24/2026-09-03/P1D</Value></Dimension><TileMatrixSetLink><TileMatrixSet>GoogleMapsCompatible_Level9</TileMatrixSet></TileMatrixSetLink><Format>image/jpeg</Format><ResourceURL resourceType='tile' format='image/jpeg' template='https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.jpg'/></Layer>
+
+<Layer><ows:Title xml:lang='en'>Dynamic Surface Water Extent (Sentinel-1)</ows:Title><ows:Identifier>OPERA_L3_Dynamic_Surface_Water_Extent-Sentinel-1</ows:Identifier><Style isDefault='true'><ows:Identifier>default</ows:Identifier></Style><Dimension><ows:Identifier>Time</ows:Identifier><ows:UOM>ISO8601</ows:UOM><Default>2026-08-26</Default><Current>false</Current><Value>2025-10-24/2026-08-26/P1D</Value></Dimension><TileMatrixSetLink><TileMatrixSet>GoogleMapsCompatible_Level12</TileMatrixSet></TileMatrixSetLink><Format>image/png</Format><ResourceURL resourceType='tile' format='image/png' template='https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/OPERA_L3_Dynamic_Surface_Water_Extent-Sentinel-1/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png'/></Layer>
+
+</Contents>
+</Capabilities>
