@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Trimmed excerpt of https://www.gdacs.org/xml/rss.xml, fetched 2026-09-03.
+Namespaces and element shapes are reproduced exactly as GDACS emits them.
+
+Four items are kept: a Pakistan flood (the district this console coordinates),
+a Red flood and an Orange flood elsewhere, and one earthquake. The earthquake
+is here so the event-type filter has something to reject. The bulky
+gdacs:resources blocks are stripped; nothing reads them.
+-->
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#" xmlns:gdacs="http://www.gdacs.org" xmlns:glide="http://glidenumber.net" xmlns:georss="http://www.georss.org/georss" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>GDACS RSS information</title>
+<item>
+      <title>Green flood alert in Pakistan</title>
+      <description>On 31/08/2026, a flood started in Pakistan, lasting until 02/09/2026 (last update). The flood caused 5 deaths and 60 displaced .</description>
+      <enclosure type="image/png" length="1" url="https://www.gdacs.org/contentdata/resources/imgtemp/gdacs/fl/dfo2026_1104136.png" />
+      <gdacs:temporary>false</gdacs:temporary>
+      <link>https://www.gdacs.org/report.aspx?eventtype=FL&amp;eventid=1104136</link>
+      <pubDate>Thu, 03 Sep 2026 07:31:02 GMT</pubDate>
+      <gdacs:dateadded>Thu, 03 Sep 2026 07:31:02 GMT</gdacs:dateadded>
+      <gdacs:datemodified>Thu, 03 Sep 2026 07:31:13 GMT</gdacs:datemodified>
+      <gdacs:iscurrent>true</gdacs:iscurrent>
+      <gdacs:fromdate>Mon, 31 Aug 2026 01:00:00 GMT</gdacs:fromdate>
+      <gdacs:todate>Wed, 02 Sep 2026 01:00:00 GMT</gdacs:todate>
+      <gdacs:durationinweek>0</gdacs:durationinweek>
+      <gdacs:year>2026</gdacs:year>
+      <dc:subject>FL1</dc:subject>
+      <guid isPermaLink="false">FL1104136</guid>
+      <geo:Point>
+        <geo:lat>31</geo:lat>
+        <geo:long>72</geo:long>
+      </geo:Point>
+      <!--gdacs:bbox format = lonmin lonmax latmin latmax-->
+      <gdacs:bbox>68 76 27 35</gdacs:bbox>
+      <georss:point>31 72</georss:point>
+      <gdacs:cap>https://www.gdacs.org/contentdata/resources/FL/1104136/cap_1104136.xml</gdacs:cap>
+      <gdacs:icon>https://www.gdacs.org/Images/gdacs_icons/alerts/Green/FL.png</gdacs:icon>
+      <gdacs:version>1</gdacs:version>
+      <gdacs:eventtype>FL</gdacs:eventtype>
+      <gdacs:alertlevel>Green</gdacs:alertlevel>
+      <gdacs:alertscore>1</gdacs:alertscore>
+      <gdacs:episodealertlevel>Green</gdacs:episodealertlevel>
+      <gdacs:episodealertscore>1</gdacs:episodealertscore>
+      <gdacs:eventname />
+      <gdacs:eventid>1104136</gdacs:eventid>
+      <gdacs:episodeid>2</gdacs:episodeid>
+      <gdacs:calculationtype />
+      <gdacs:severity unit="" value="0">Magnitude 0 </gdacs:severity>
+      <gdacs:population unit="Population Affected" value="3">3 deaths and 60 displaced </gdacs:population>
+      <gdacs:vulnerability value="0" />
+      <gdacs:iso3>PAK</gdacs:iso3>
+      <gdacs:country>Pakistan</gdacs:country>
+      <gdacs:glide />
+      <gdacs:mapimage />
+      <gdacs:maplink />
+      <gdacs:gtsimage />
+      <gdacs:gtslink />
+      
+    </item>
+<item>
+      <title>Orange flood alert in Nepal</title>
+      <description>On 26/08/2026, a flood started in Nepal, lasting until 28/08/2026 (last update). The flood caused 527 deaths and 0 displaced .</description>
+      <enclosure type="image/png" length="1" url="https://www.gdacs.org/contentdata/resources/imgtemp/gdacs/fl/dfo2026_1104124.png" />
+      <gdacs:temporary>false</gdacs:temporary>
+      <link>https://www.gdacs.org/report.aspx?eventtype=FL&amp;eventid=1104124</link>
+      <pubDate>Tue, 01 Sep 2026 13:57:04 GMT</pubDate>
+      <gdacs:dateadded>Tue, 01 Sep 2026 13:57:04 GMT</gdacs:dateadded>
+      <gdacs:datemodified>Thu, 03 Sep 2026 07:40:15 GMT</gdacs:datemodified>
+      <gdacs:iscurrent>true</gdacs:iscurrent>
+      <gdacs:fromdate>Wed, 26 Aug 2026 01:00:00 GMT</gdacs:fromdate>
+      <gdacs:todate>Tue, 01 Sep 2026 14:00:00 GMT</gdacs:todate>
+      <gdacs:durationinweek>0</gdacs:durationinweek>
+      <gdacs:year>2026</gdacs:year>
+      <dc:subject>FL3</dc:subject>
+      <guid isPermaLink="false">FL1104124</guid>
+      <geo:Point>
+        <geo:lat>27.2952744</geo:lat>
+        <geo:long>85.3649145</geo:long>
+      </geo:Point>
+      <!--gdacs:bbox format = lonmin lonmax latmin latmax-->
+      <gdacs:bbox>81.3649145 89.3649145 23.2952744 31.2952744</gdacs:bbox>
+      <georss:point>27.2952744 85.3649145</georss:point>
+      <gdacs:cap>https://www.gdacs.org/contentdata/resources/FL/1104124/cap_1104124.xml</gdacs:cap>
+      <gdacs:icon>https://www.gdacs.org/Images/gdacs_icons/alerts/Red/FL.png</gdacs:icon>
+      <gdacs:version>1</gdacs:version>
+      <gdacs:eventtype>FL</gdacs:eventtype>
+      <gdacs:alertlevel>Red</gdacs:alertlevel>
+      <gdacs:alertscore>3</gdacs:alertscore>
+      <gdacs:episodealertlevel>Red</gdacs:episodealertlevel>
+      <gdacs:episodealertscore>3</gdacs:episodealertscore>
+      <gdacs:eventname />
+      <gdacs:eventid>1104124</gdacs:eventid>
+      <gdacs:episodeid>1</gdacs:episodeid>
+      <gdacs:calculationtype />
+      <gdacs:severity unit="" value="0">Magnitude 0 </gdacs:severity>
+      <gdacs:population unit="Population Affected" value="955">955 deaths and 3458 displaced </gdacs:population>
+      <gdacs:vulnerability value="0" />
+      <gdacs:iso3>NPL</gdacs:iso3>
+      <gdacs:country>Nepal</gdacs:country>
+      <gdacs:glide>FL-2026-000167-NPL</gdacs:glide>
+      <gdacs:mapimage />
+      <gdacs:maplink />
+      <gdacs:gtsimage />
+      <gdacs:gtslink />
+      
+    </item>
+<item>
+      <title>Orange flood alert in India</title>
+      <description>On 09/08/2026, a flood started in India, lasting until 30/08/2026 (last update). The flood caused 20 deaths and 240570 displaced .</description>
+      <enclosure type="image/png" length="1" url="https://www.gdacs.org/contentdata/resources/imgtemp/gdacs/fl/dfo2026_1104121.png" />
+      <gdacs:temporary>false</gdacs:temporary>
+      <link>https://www.gdacs.org/report.aspx?eventtype=FL&amp;eventid=1104121</link>
+      <pubDate>Thu, 27 Aug 2026 08:14:48 GMT</pubDate>
+      <gdacs:dateadded>Thu, 27 Aug 2026 08:14:48 GMT</gdacs:dateadded>
+      <gdacs:datemodified>Thu, 03 Sep 2026 07:29:27 GMT</gdacs:datemodified>
+      <gdacs:iscurrent>true</gdacs:iscurrent>
+      <gdacs:fromdate>Sun, 09 Aug 2026 01:00:00 GMT</gdacs:fromdate>
+      <gdacs:todate>Wed, 02 Sep 2026 01:00:00 GMT</gdacs:todate>
+      <gdacs:durationinweek>3</gdacs:durationinweek>
+      <gdacs:year>2026</gdacs:year>
+      <dc:subject>FL1</dc:subject>
+      <guid isPermaLink="false">FL1104121</guid>
+      <geo:Point>
+        <geo:lat>29.3506056</geo:lat>
+        <geo:long>79.5541717</geo:long>
+      </geo:Point>
+      <!--gdacs:bbox format = lonmin lonmax latmin latmax-->
+      <gdacs:bbox>75.5541717 83.5541717 25.3506056 33.3506056</gdacs:bbox>
+      <georss:point>29.3506056 79.5541717</georss:point>
+      <gdacs:cap>https://www.gdacs.org/contentdata/resources/FL/1104121/cap_1104121.xml</gdacs:cap>
+      <gdacs:icon>https://www.gdacs.org/Images/gdacs_icons/alerts/Orange/FL.png</gdacs:icon>
+      <gdacs:version>1</gdacs:version>
+      <gdacs:eventtype>FL</gdacs:eventtype>
+      <gdacs:alertlevel>Orange</gdacs:alertlevel>
+      <gdacs:alertscore>2</gdacs:alertscore>
+      <gdacs:episodealertlevel>Green</gdacs:episodealertlevel>
+      <gdacs:episodealertscore>1</gdacs:episodealertscore>
+      <gdacs:eventname />
+      <gdacs:eventid>1104121</gdacs:eventid>
+      <gdacs:episodeid>11</gdacs:episodeid>
+      <gdacs:calculationtype />
+      <gdacs:severity unit="" value="0">Magnitude 0 </gdacs:severity>
+      <gdacs:population unit="Population Affected" value="3">3 deaths </gdacs:population>
+      <gdacs:vulnerability value="0" />
+      <gdacs:iso3>IND</gdacs:iso3>
+      <gdacs:country>India</gdacs:country>
+      <gdacs:glide>FL-2026-000165-IND</gdacs:glide>
+      <gdacs:mapimage />
+      <gdacs:maplink />
+      <gdacs:gtsimage />
+      <gdacs:gtslink />
+      
+    </item>
+<item>
+      <title>Green earthquake (Magnitude 6.2M, Depth:125.905km) in South Sandwich Islands Region 02/09/2026 23:46 UTC, [unknown].</title>
+      <description>On 9/2/2026 11:46:57 PM, an earthquake occurred in South Sandwich Islands Region potentially affecting [unknown]. The earthquake had Magnitude 6.2M, Depth:125.905km.</description>
+      <enclosure type="image/png" length="1" url="https://www.gdacs.org/contentdata/resources/imgtemp/gdacs/eq/eq1730821_1.png" />
+      <gdacs:temporary>false</gdacs:temporary>
+      <link>https://www.gdacs.org/report.aspx?eventtype=EQ&amp;eventid=1563254</link>
+      <pubDate>Thu, 03 Sep 2026 00:02:32 GMT</pubDate>
+      <gdacs:dateadded>Thu, 03 Sep 2026 00:02:32 GMT</gdacs:dateadded>
+      <gdacs:datemodified>Thu, 03 Sep 2026 01:53:55 GMT</gdacs:datemodified>
+      <gdacs:iscurrent>true</gdacs:iscurrent>
+      <gdacs:fromdate>Wed, 02 Sep 2026 23:46:57 GMT</gdacs:fromdate>
+      <gdacs:todate>Wed, 02 Sep 2026 23:46:57 GMT</gdacs:todate>
+      <gdacs:durationinweek>0</gdacs:durationinweek>
+      <gdacs:year>2026</gdacs:year>
+      <dc:subject>EQ1</dc:subject>
+      <guid isPermaLink="false">EQ1563254</guid>
+      <geo:Point>
+        <geo:lat>-56.2062</geo:lat>
+        <geo:long>-27.9085</geo:long>
+      </geo:Point>
+      <!--gdacs:bbox format = lonmin lonmax latmin latmax-->
+      <gdacs:bbox>-31.9085 -23.9085 -60.2062 -52.2062</gdacs:bbox>
+      <georss:point>-56.2062 -27.9085</georss:point>
+      <gdacs:cap>https://www.gdacs.org/contentdata/resources/EQ/1563254/cap_1563254.xml</gdacs:cap>
+      <gdacs:icon>https://www.gdacs.org/Images/gdacs_icons/alerts/Green/EQ.png</gdacs:icon>
+      <gdacs:version>1</gdacs:version>
+      <gdacs:eventtype>EQ</gdacs:eventtype>
+      <gdacs:alertlevel>Green</gdacs:alertlevel>
+      <gdacs:alertscore>0</gdacs:alertscore>
+      <gdacs:episodealertlevel>Green</gdacs:episodealertlevel>
+      <gdacs:episodealertscore>1</gdacs:episodealertscore>
+      <gdacs:eventname />
+      <gdacs:eventid>1563254</gdacs:eventid>
+      <gdacs:episodeid>1730821</gdacs:episodeid>
+      <gdacs:calculationtype>tsunami</gdacs:calculationtype>
+      <gdacs:severity unit="M" value="6.2">Magnitude 6.2M, Depth:125.9km</gdacs:severity>
+      <gdacs:population unit="in MMI -" value="0" />
+      <gdacs:vulnerability value="1.3145341380124" />
+      <gdacs:iso3 />
+      <gdacs:country>South Sandwich Islands Region</gdacs:country>
+      <gdacs:glide />
+      <gdacs:mapimage />
+      <gdacs:maplink />
+      <gdacs:gtsimage />
+      <gdacs:gtslink />
+      
+    </item>
+  </channel>
+</rss>
