@@ -95,15 +95,54 @@ export default function AboutPage() {
       </Section>
 
       <Section title="Where the data comes from">
-        <p className="text-ink-muted">
-          {demo.data?.note ??
-            "Synthetic requests modelled on published flood reporting. No real people."}
+        <p className="text-ink">
+          The requests are synthetic. The situation around them is real.
         </p>
         <p className="mt-2 text-ink-muted">
-          Places are resolved with OpenStreetMap&apos;s Nominatim and rendered on OpenStreetMap
-          tiles. Rainfall comes from Open-Meteo. All are free services used within their usage
-          policies, and every geocoding result is cached permanently so the demo does not
-          re-ask.
+          {demo.data?.note ??
+            "Synthetic requests modelled on published flood reporting. No real people."}{" "}
+          No help request shown here was sent by anybody.
+        </p>
+        <p className="mt-2 text-ink-muted">
+          Everything else on the console is live. Places are resolved with
+          OpenStreetMap&apos;s Nominatim and rendered on OpenStreetMap tiles; rainfall
+          and river discharge come from Open-Meteo; satellite layers come from NASA
+          GIBS; national damage figures are parsed from NDMA&apos;s daily situation
+          report; wider-response headlines come from ReliefWeb. All are free services
+          used within their usage policies, and results are cached so the console does
+          not re-ask.
+        </p>
+
+        <h3 className="mb-1 mt-4 text-ink">What the satellite layers can and cannot show</h3>
+        <ul className="list-disc space-y-1 pl-5 text-ink-muted">
+          <li>
+            <span className="text-ink">Cloud beats optical sensors.</span> MODIS and VIIRS
+            cannot see the ground through cloud, and a flood happens under cloud. Read the
+            key: <span className="text-ink">grey</span> is &ldquo;Insufficient Data&rdquo;,
+            which almost always means cloud, while <span className="text-ink">clear</span>{" "}
+            means &ldquo;No Water&rdquo;. Over this district grey routinely covers more
+            than half a tile and every water class together covers under one percent, so
+            reading grey as coverage inverts the picture entirely.
+          </li>
+          <li>
+            <span className="text-ink">250 m pixels describe areas, not households.</span>{" "}
+            A flood pixel over a village is not evidence about any one roof, and nothing on
+            this console uses it that way — the same reason photo severity is switched off
+            rather than guessed.
+          </li>
+          <li>
+            Radar (Sentinel-1) does see through cloud, but its coverage is scene-based and
+            is frequently absent over any given district on any given day. It is offered
+            best-effort and says so when there is nothing to show.
+          </li>
+        </ul>
+
+        <h3 className="mb-1 mt-4 text-ink">What this data is not allowed to do</h3>
+        <p className="text-ink-muted">
+          None of it touches the urgency formula above, and none of it can authorise a
+          dispatch. Urgency stays computable from the message alone, which is what makes
+          it explainable to the person being asked to act on it. That is enforced by a
+          test that reads this repository&apos;s own imports, not by a convention.
         </p>
       </Section>
 

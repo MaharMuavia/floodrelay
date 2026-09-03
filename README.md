@@ -50,6 +50,49 @@ it is not.
 | REST API + SSE stream | Working, 28 smoke tests |
 | Next.js console | Builds and runs; queue, map, activity feed, decision dock |
 | PII redaction | Verified end to end — names and numbers become `PERSON_1` / `CALLER_1`, inline sign-offs included; 29 tests |
+| Satellite layers (NASA GIBS) | Working against the live service — 10 layers, no API key; flood extent, true colour and IMERG rainfall drawn on the map with the published colour key |
+| River discharge (GloFAS via Open-Meteo) | Working against the live service — real discharge on the Kabul river at Nowshera |
+| NDMA daily situation report | Working against the live PDF — report number, date, province and district damage figures parsed; 21 tests |
+| ReliefWeb situation context | **Repaired.** The v1 endpoint this shipped against was decommissioned and had been silently dead; now v2 with a keyless RSS fallback |
+| GDACS global flood alerts | Working against the live feed — worldwide flood alerts by severity, with this country called out; keyless, 15-minute cache; 17 tests |
+
+### Real data, and what it is not allowed to do
+
+The forty help requests are synthetic and always will be. Everything around them
+is live: NASA GIBS satellite imagery, GloFAS river discharge, NDMA's daily
+national situation report, ReliefWeb headlines, and GDACS worldwide flood
+alerts.
+
+GDACS is the one source that answers a question local data cannot: whether this
+district's flood is tracked internationally, and how it ranks. At the time of
+writing it shows Pakistan Green (3 deaths, 60 displaced) against Nepal Red
+(955 deaths) — a comparison that shapes what outside help is plausible.
+
+None of it touches the urgency formula and none of it can authorise a dispatch.
+That is not a convention — `test_scoring_imports_no_context_source` parses
+`scoring.py` and fails if any context module appears in its imports, and
+`test_compute_urgency_accepts_no_context_arguments` pins the signature.
+
+Two limits are stated on screen rather than buried here:
+
+- **Grey on a flood layer is "Insufficient Data", not dry ground.** Measured
+  over Nowshera, grey covers 54–64% of a MODIS flood tile and every water class
+  together covers under 0.3%. Read the wrong way round, the layer says the
+  opposite of what is true, so the published colour key is rendered beside it.
+- **250 m pixels describe areas, never households.** No satellite value is shown
+  on an individual request, for the same reason photo severity is switched off.
+- **A layer GIBS lists is not a layer GIBS serves here.** On 2026-09-03 six of
+  the ten curated layers returned 404 over Nowshera while their capabilities
+  entries all named that day. Each layer is therefore probed with one real tile
+  when the manifest is built; the picker marks the ones with nothing to show and
+  the map says so, rather than drawing an empty overlay that reads as "no
+  flood".
+
+`pdfplumber` is an optional extra (`uv sync --extra ndma`); without it the NDMA
+tool reports that it is missing rather than failing obscurely. When NDMA
+eventually changes the sitrep layout, the console will say which report it could
+not parse and link the PDF — it will not fall back to an older report and it
+will not show a zero.
 
 ### Not built, or built differently than the brief specified
 
