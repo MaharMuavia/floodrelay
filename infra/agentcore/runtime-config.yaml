@@ -3,6 +3,11 @@
 # NOT APPLIED. Written from the documented shape, never run against AWS from
 # this machine (no credentials were available). Verify field names against the
 # current AgentCore API before trusting it, and replace every <PLACEHOLDER>.
+#
+# What IS verified is the contract this describes: the container must be ARM64,
+# listen on 0.0.0.0:8080, and serve POST /invocations and GET /ping. The app
+# does all of that -- see the README in this directory for the executed output,
+# and backend/tests/test_agentcore_contract.py for the tests that keep it true.
 
 name: floodrelay-agent
 description: >-
@@ -12,6 +17,8 @@ description: >-
 
 container:
   image: "<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/floodrelay-agent:latest"
+  # Required by the runtime contract. An amd64 image is refused.
+  platform: linux/arm64
   port: 8080
 
 executionRoleArn: "arn:aws:iam::<ACCOUNT_ID>:role/FloodRelayAgentExecutionRole"
@@ -49,9 +56,16 @@ environment:
 secrets:
   - name: INTERNAL_TOKEN
     valueFrom: "arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:floodrelay/internal-token"
+  # POST /intake/webhook verifies X-Hub-Signature-256 against this. It fails
+  # CLOSED: with no secret the route refuses everything, signed or not.
+  - name: WEBHOOK_SECRET
+    valueFrom: "arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:floodrelay/webhook-secret"
 
 healthCheck:
-  path: /healthz
+  # /ping, NOT /healthz. The runtime contract names this path and expects
+  # {"status": "Healthy"} or {"status": "HealthyBusy"}. /healthz is the richer
+  # operator view and is kept for humans and for the console's About screen.
+  path: /ping
   # Startup installs the seed roster and opens the store, so allow for it.
   startPeriodSeconds: 30
   intervalSeconds: 30

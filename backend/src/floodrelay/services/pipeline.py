@@ -29,6 +29,19 @@ from .events import get_bus
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="floodrelay-pipeline")
 _lock = threading.Lock()
 
+# Queued-or-running work, for the AgentCore /ping contract. The runtime treats a
+# session reporting HealthyBusy as still active and keeps it alive, so this has
+# to reflect real background work and nothing else -- reporting busy when idle
+# would hold sessions open until MaxLifetime and burn the session quota.
+_inflight_lock = threading.Lock()
+_inflight_count = 0
+
+
+def inflight() -> int:
+    """How many pipeline runs are queued or executing right now."""
+    with _inflight_lock:
+        return _inflight_count
+
 
 class PipelineService:
     def __init__(self, *, use_model: bool = True) -> None:
@@ -117,13 +130,21 @@ class PipelineService:
 
     def submit(self, request: HelpRequest) -> None:
         """Queue a run on the worker pool."""
+        global _inflight_count
+        with _inflight_lock:
+            _inflight_count += 1
         _executor.submit(self._safe_process, request)
 
     def _safe_process(self, request: HelpRequest) -> None:
-        # Already audited and published inside `process`; swallowing here just
-        # stops one bad request from killing the worker thread.
-        with contextlib.suppress(Exception):
-            self.process(request)
+        global _inflight_count
+        try:
+            # Already audited and published inside `process`; swallowing here just
+            # stops one bad request from killing the worker thread.
+            with contextlib.suppress(Exception):
+                self.process(request)
+        finally:
+            with _inflight_lock:
+                _inflight_count -= 1
 
     # --- resuming ----------------------------------------------------------
 
