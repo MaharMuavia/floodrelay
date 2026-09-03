@@ -68,6 +68,56 @@ _WEATHER_WORDS = ("rainfall", "forecast", "more rain", "rain is expected")
 # Tools whose output legitimately entitles an explanation to talk about weather.
 _WEATHER_TOOLS = ("rainfall", "river_discharge")
 
+# Language that disputes the score rather than explaining it. prompts/triage.md
+# tells the model the number is not its to change; this is what makes that a
+# rule rather than a request. Observed with qwen2.5:3b, which wrote "the request
+# scores low due to the low urgency of a stranded situation without immediate
+# danger" for a four-person roof rescue -- editorialising about a number it was
+# handed, in the sentence a coordinator reads before committing the only boat.
+#
+# Describing the score is fine and the prompt's own example does it ("it scores
+# near the top of the queue because it is a rescue with children involved").
+# Only disagreement is caught here.
+_SCORE_DISPUTE = re.compile(
+    r"""
+      (?:too\s+(?:high|low))
+    | (?:should\s+(?:be|have\s+been)\s+(?:higher|lower|rated|scored))
+    | (?:(?:higher|lower)\s+than\s+(?:it|the)\s+(?:is|score))
+    | (?:(?:over|under)(?:\s|-)?(?:stated|rated|scored|estimated))
+    | (?:(?:does\s+not|doesn't|do\s+not)\s+(?:warrant|justify|merit))
+    | (?:(?:i|I)\s+would\s+(?:rate|score|rank))
+    | (?:(?:in|from)\s+my\s+(?:opinion|view|assessment))
+    | (?:(?:low|high)\s+urgency\s+of)
+    | (?:without\s+immediate\s+danger)
+    """,
+    re.I | re.X,
+)
+
+
+def _disputes_the_score(text: str) -> bool:
+    """True when the explanation argues with the number instead of explaining it."""
+    return _SCORE_DISPUTE.search(text or "") is not None
+
+
+# The component values are passed to the model so it can name the biggest
+# driver in ordinary words. prompts/triage.md says never to quote them, and
+# qwen2.5:3b quoted them anyway: "scores low due to the low weight given to
+# people (0.00) and the low weight given to water (0.06)". A coordinator at 2am
+# needs "mostly because children are involved", not the inside of the formula --
+# and the formula is already on screen for anyone who wants it.
+_COMPONENT_LEAK = re.compile(
+    r"""
+      (?:\b(?:weight|weighting|component|coefficient|sub-?score)s?\b)
+    | (?:\b(?:kind|vulnerability|recency|water_level|photo)\s*[=:]\s*\d)
+    """,
+    re.I | re.X,
+)
+
+
+def _leaks_the_components(text: str) -> bool:
+    """True when the explanation exposes the formula's internals."""
+    return _COMPONENT_LEAK.search(text or "") is not None
+
 
 def _is_grounded(
     text: str,
@@ -92,7 +142,12 @@ def _is_grounded(
         and not fetched_weather
         and any(w in lowered for w in _WEATHER_WORDS)
     )
-    return not (cites_absent_photo or cites_absent_weather)
+    return not (
+        cites_absent_photo
+        or cites_absent_weather
+        or _disputes_the_score(text)
+        or _leaks_the_components(text)
+    )
 
 
 def deterministic_explanation(request: HelpRequest, breakdown: UrgencyBreakdown) -> str:
@@ -138,6 +193,47 @@ def deterministic_explanation(request: HelpRequest, breakdown: UrgencyBreakdown)
     )
 
 
+def _grounded_facts(request: HelpRequest) -> str:
+    """The facts `extract` already established, restated for the explainer.
+
+    Without this the model re-reads the raw message to work out who is involved,
+    and re-reading is exactly where it goes wrong. Observed with qwen2.5:3b:
+    "4 log chhat par phanse hain" -- Roman Urdu for "4 people are trapped on the
+    roof" -- came back as "four people are stranded on a log", and a later
+    attempt called four people "the lack of people involved".
+
+    Those counts were extracted once and grounded against the message by
+    `extract.normalise`. Handing them over rather than asking a second model
+    pass to rediscover them removes a whole class of wrong sentence, and it is
+    the same principle as the rest of the pipeline: establish a fact once, then
+    carry it, rather than re-deriving it and hoping for the same answer.
+    """
+    need = request.need
+    if need is None:
+        return ""
+
+    facts: list[str] = [f"need: {need.kind}"]
+    if need.people_total:
+        facts.append(f"{need.people_total} people in total")
+    if need.children:
+        facts.append(f"{need.children} of them children")
+    if need.elderly:
+        facts.append(f"{need.elderly} elderly")
+    if need.disabled:
+        facts.append("someone who cannot move unaided")
+    if need.pregnant:
+        facts.append("a pregnant woman")
+    if need.water_level_note:
+        facts.append(f"water described as {need.water_level_note!r}")
+    if not any((need.people_total, need.children, need.elderly)):
+        facts.append("no headcount was stated in the message")
+
+    return (
+        "Already established from the message, do not re-read it for these "
+        f"and do not contradict them: {'; '.join(facts)}.\n"
+    )
+
+
 def _context_tools() -> list[Any]:
     """The tools the explanation agent may reach for, and nothing more.
 
@@ -148,7 +244,7 @@ def _context_tools() -> list[Any]:
     human gate would refuse it anyway -- this is the second lock, not the first.
     """
     from ..tools.gdacs import global_flood_alerts
-    from ..tools.ndma import situation as ndma_situation
+    from ..tools.ndma import ndma_situation
     from ..tools.river import river_discharge
     from ..tools.roster import roster_search
     from ..tools.weather import rainfall
@@ -193,6 +289,7 @@ def run(
         system = load_prompt("triage")
         user = (
             f"Message: {request.raw_text}\n"
+            f"{_grounded_facts(request)}"
             f"Computed urgency: {breakdown.total:.2f}\n"
             f"Components: kind={breakdown.kind:.2f}, people={breakdown.vulnerability:.2f}, "
             f"photo={breakdown.photo:.2f}, water={breakdown.water_level:.2f}, "

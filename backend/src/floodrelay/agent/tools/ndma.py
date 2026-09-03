@@ -28,6 +28,8 @@ import html
 import re
 from typing import Any
 
+from strands import tool
+
 from ...config import get_settings
 from ...store.table import Table, get_table, ndma_pk
 from ._http import get_bytes, get_text
@@ -364,3 +366,24 @@ def _answer(
         "district_reported": match is not None,
         "districts_reported": sorted(districts),
     }
+
+
+@tool
+def ndma_situation(district: str = "Nowshera", province: str = "KP") -> dict[str, Any]:
+    """National flood damage figures for one district and its province.
+
+    Reads the newest NDMA daily situation report. This is national reporting,
+    published a day behind and aggregated to district level -- it says how bad
+    the flood is in the area, never anything about an individual household.
+
+    Args:
+        district: District name as NDMA spells it, e.g. "Nowshera".
+        province: Province abbreviation, e.g. "KP", "Sindh", "Punjab".
+
+    Returns:
+        Deaths, injuries and houses damaged for the district and the province,
+        plus the report number and date. Returns `available: false` with a
+        reason -- an unparseable report, a missing PDF library, an unreachable
+        site -- rather than raising or falling back to an older report.
+    """
+    return situation(district=district, province=province)

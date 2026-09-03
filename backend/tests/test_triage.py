@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from conftest import FIXED_NOW, make_need, make_request
+from floodrelay.agent.nodes import triage
 from floodrelay.agent.nodes.triage import (
     _clean_explanation,
     deterministic_explanation,
@@ -157,3 +158,140 @@ def test_an_ungrounded_model_answer_falls_back_to_the_deterministic_sentence() -
 
     assert "photograph" not in explanation.casefold()
     assert "4 people" in explanation
+
+
+# --- the score is not the model's to argue with -----------------------------
+#
+# prompts/triage.md tells the model the number is not its to change. That was a
+# request until this guard existed. Observed with qwen2.5:3b on a four-person
+# roof rescue: "The request scores low due to the low urgency of a stranded
+# situation without immediate danger." The urgency was unaffected -- it is
+# arithmetic -- but that sentence is what a coordinator reads before committing
+# the only boat, and it argues against acting.
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "Four people are on a roof. The request scores low due to the low urgency "
+        "of a stranded situation without immediate danger.",
+        "Three children are trapped, though the urgency seems too high to me.",
+        "This should be rated lower than it is given the circumstances described.",
+        "The score is overstated for what is a routine request for assistance.",
+        "Six people need a boat, but this does not warrant the priority given.",
+        "In my opinion the urgency here is lower than the number suggests.",
+    ],
+)
+def test_an_explanation_that_argues_with_the_score_is_rejected(claim: str) -> None:
+    request = make_request("r_1", need=make_need(kind="rescue", people_total=4))
+    assert not triage._is_grounded(claim, request, None)
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        # The prompt's own worked example. Describing where the score lands is
+        # the job; only disagreeing with it is not.
+        "Four people including three children are on a roof at Mohib Banda with "
+        "the water still rising. It scores near the top of the queue because it "
+        "is a rescue with children involved.",
+        "Six people including two children need to be taken out of the water at "
+        "Kheshgi Payan, and one of them cannot move unaided.",
+        "This is a request for drinking water for a household that is otherwise "
+        "safe, which places it low in the queue.",
+    ],
+)
+def test_an_explanation_that_merely_describes_the_score_is_kept(claim: str) -> None:
+    request = make_request("r_1", need=make_need(kind="rescue", people_total=4))
+    assert triage._is_grounded(claim, request, None)
+
+
+def test_the_disputed_explanation_falls_back_to_the_deterministic_sentence() -> None:
+    """End to end: a disputing model answer must not reach the coordinator."""
+    request = make_request(
+        "r_1",
+        need=make_need(kind="rescue", people_total=4),
+        received_at=FIXED_NOW,
+    )
+    original = triage.complete
+    triage.complete = lambda *a, **k: (  # type: ignore[assignment]
+        "The request scores low due to the low urgency of a stranded situation "
+        "without immediate danger."
+    )
+    try:
+        _urgency, breakdown, explanation = triage.run(request)
+    finally:
+        triage.complete = original  # type: ignore[assignment]
+
+    assert explanation == triage.deterministic_explanation(request, breakdown)
+    assert "low urgency of" not in explanation
+
+
+# --- the formula's internals stay out of the sentence -----------------------
+#
+# The component values are given to the model so it can name the biggest driver
+# in ordinary words. prompts/triage.md says never to quote them. qwen2.5:3b
+# quoted them anyway: "scores low due to the low weight given to people (0.00)
+# and the low weight given to water (0.06)". The breakdown is already on the
+# request detail screen for anyone who wants it; a coordinator reading the queue
+# needs a sentence, not the inside of an equation.
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "Four people are on a roof. This scores low due to the low weight given "
+        "to people (0.00) and the low weight given to water (0.06).",
+        "Three children are trapped; the vulnerability component is 0.25 here.",
+        "This is a rescue with kind=1.00 and recency=0.05 contributing.",
+        "The coefficient for water level pushed this up the queue.",
+    ],
+)
+def test_an_explanation_that_quotes_the_formula_is_rejected(claim: str) -> None:
+    request = make_request("r_1", need=make_need(kind="rescue", people_total=4))
+    assert not triage._is_grounded(claim, request, None)
+
+
+def test_naming_the_driver_in_words_is_still_allowed() -> None:
+    """The point of the rule is plain language, not silence about the reason."""
+    request = make_request("r_1", need=make_need(kind="rescue", people_total=4))
+    claim = (
+        "Four people are on a roof at Pir Sabak with the water still rising. It "
+        "sits near the top of the queue mostly because it is a rescue."
+    )
+    assert triage._is_grounded(claim, request, None)
+
+
+# --- the facts reach the explainer instead of being re-read -----------------
+
+
+def test_the_grounded_facts_are_handed_to_the_model() -> None:
+    """Re-reading the raw message is where the explanation went wrong.
+
+    "4 log chhat par phanse hain" is Roman Urdu for "4 people are trapped on the
+    roof"; qwen2.5:3b read it as "four people stranded on a log". Those counts
+    were already extracted and grounded once, so they are stated rather than
+    rediscovered.
+    """
+    request = make_request(
+        "r_1",
+        raw_text="4 log chhat par phanse hain",
+        need=make_need(
+            kind="rescue", people_total=4, children=2, disabled=True,
+            water_level_note="pani tez barh raha hai",
+        ),
+    )
+    facts = triage._grounded_facts(request)
+    assert "4 people in total" in facts
+    assert "2 of them children" in facts
+    assert "cannot move unaided" in facts
+    assert "do not contradict them" in facts
+
+
+def test_a_request_with_no_extraction_states_no_facts() -> None:
+    assert triage._grounded_facts(make_request("r_1")) == ""
+
+
+def test_a_request_with_no_headcount_says_so_rather_than_implying_zero() -> None:
+    request = make_request("r_1", need=make_need(kind="rescue"))
+    assert "no headcount was stated" in triage._grounded_facts(request)

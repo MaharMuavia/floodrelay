@@ -9,7 +9,7 @@ from .gdacs import global_flood_alerts
 from .geocode import GeocodeResult, geocode_place, parse_coordinates, resolve
 from .imagery import score_photo, vision_available
 from .imagery_layers import available_layers
-from .ndma import situation as ndma_situation
+from .ndma import ndma_situation
 from .places import find_places
 from .reliefweb import situation_context
 from .river import river_discharge

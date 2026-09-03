@@ -73,7 +73,12 @@ def main() -> int:
     # The same event stream the console's activity feed renders, read back off
     # the bus this run published into.
     events = [e for e in get_bus().recent(200) if e.get("request_id") == request.id]
-    tool_calls: list[dict[str, Any]] = [e for e in events if e.get("type") == "tool_call"]
+    all_tools = [e for e in events if e.get("type") == "tool_call"]
+
+    # The distinction this whole script exists to make. A tool the pipeline
+    # called from Python is not evidence of anything about the model.
+    by_model: list[dict[str, Any]] = [e for e in all_tools if e.get("chosen_by") == "model"]
+    by_pipeline: list[dict[str, Any]] = [e for e in all_tools if e.get("chosen_by") != "model"]
 
     print("--- the run, as the console saw it -------------------------------")
     for event in events:
@@ -81,16 +86,20 @@ def main() -> int:
         if kind == "node_start":
             print(f"  NODE  {event['node']}")
         elif kind == "tool_call":
-            print(f"    TOOL  {event['tool']:<16} {event['summary']}")
+            who = "MODEL" if event.get("chosen_by") == "model" else "pipe "
+            print(f"    [{who}] {event['tool']:<16} {event['summary']}")
         elif kind == "node_complete":
             print(f"        -> {event.get('result')}")
 
     print()
     print("=" * 70)
     print(f"run took {elapsed:.1f}s")
-    print(f"nodes visited      : {' -> '.join(state.visited)}")
-    print(f"tool calls by model: {len(tool_calls)}")
-    for call in tool_calls:
+    print(f"nodes visited        : {' -> '.join(state.visited)}")
+    print(f"tools CHOSEN BY MODEL: {len(by_model)}")
+    for call in by_model:
+        print(f"  - {call['tool']}: {call['summary']}")
+    print(f"tools called by the pipeline: {len(by_pipeline)}")
+    for call in by_pipeline:
         print(f"  - {call['tool']}: {call['summary']}")
 
     need = state.request.need
@@ -118,9 +127,10 @@ def main() -> int:
     print(f"approvals consumed : {len(dispatched)}")
     print(f"request dispatched : {state.request.status == 'dispatched'}")
 
-    if not tool_calls:
+    if not by_model:
         print()
-        print("FAILED: the model called no tools at all.")
+        print("FAILED: the model chose no tools at all.")
+        print("Every tool above was called from Python, which is the old behaviour.")
         return 1
     if state.request.status == "dispatched":
         print()

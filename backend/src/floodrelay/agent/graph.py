@@ -108,8 +108,26 @@ class Pipeline:
             }
         )
 
-    def _tool(self, request_id: str, tool: str, summary: str) -> None:
-        self.emit({"type": "tool_call", "request_id": request_id, "tool": tool, "summary": summary})
+    def _tool(
+        self, request_id: str, tool: str, summary: str, *, chosen_by: str = "pipeline"
+    ) -> None:
+        """Announce a tool call.
+
+        `chosen_by` separates the two genuinely different things this emits.
+        "model" means a Strands Agent decided to call this tool; "pipeline"
+        means our own Python called it. Collapsing them would let the console --
+        and anyone reading a trace -- credit the model with work it did not do,
+        which is the exact claim this project has to be careful about.
+        """
+        self.emit(
+            {
+                "type": "tool_call",
+                "request_id": request_id,
+                "tool": tool,
+                "summary": summary,
+                "chosen_by": chosen_by,
+            }
+        )
 
     def _save(self, state: RunState) -> None:
         from ..models.common import utcnow
@@ -162,7 +180,7 @@ class Pipeline:
                 trace_id=state.request.trace_id,
             )
             for call in calls:
-                self._tool(state.request.id, call.name, call.summary())
+                self._tool(state.request.id, call.name, call.summary(), chosen_by="model")
             placed_by_agent = point is not None
 
         if not placed_by_agent:

@@ -58,7 +58,7 @@ a pure function before the model is asked anything; geolocation confidence is
 computed from the candidate list the tool returned, not from the model's
 description of it.
 
-**Verification** (real output in [Verification](#verification) below): 367 tests,
+**Verification** (real output in [Verification](#verification) below): 385 tests,
 `ruff` and `mypy --strict` clean, and `scripts/e2e.py` replaying seed messages
 through the same code path the live routes use with `unapproved dispatches: 0`.
 
@@ -67,7 +67,7 @@ through the same code path the live routes use with `unapproved dispatches: 0`.
 | Area | State |
 |---|---|
 | Strands `Graph` for the forward pass | Working — six nodes, a conditional retry cycle, the dedupe/match handback, a terminal gate; 11 topology tests |
-| Model-driven tool calling | Working — with `bedrock`/`anthropic` the model chooses and calls the `@tool` functions; the gate fires on that path, proven by 6 tests over a real `Agent` |
+| Model-driven tool calling | **Working, and demonstrated live** — `scripts/tool_trace.py` shows the model choosing `geocode_place` on a real message under `qwen2.5:3b`; the gate fires on that path, proven by 6 tests over a real `Agent` |
 | Extraction (English, Urdu, Roman Urdu) | Working against a live local model |
 | Grounding of model output | Working — counts and booleans are checked back against the message |
 | Deterministic urgency scoring | Working, 20 unit tests |
@@ -138,11 +138,12 @@ will not show a zero.
   `test_tool_agent.py` rather than against a live one. Set `ANTHROPIC_API_KEY`
   and the same code runs against a real model with no other change; `/healthz`
   reports which provider is live and whether tool-calling is active.
-- **Ollama remains supported but is no longer the headline.** The local models
-  available here (`deepseek-r1:7b`, `phi3:mini`) advertise `completion` only, so
-  under Ollama the tools are called from Python around the model.
-  `OLLAMA_TOOL_CALLING=true` turns the model-driven path on for a local model
-  that does support tools (qwen2.5, llama3.1, mistral-nemo).
+- **Ollama is a first-class tool-calling path, with `qwen2.5:3b`.** The two
+  models originally on this machine (`deepseek-r1:7b`, `phi3:mini`) advertise
+  `completion` only; `qwen2.5:3b` tool-calls and is what the live trace above was
+  produced with. `OLLAMA_TOOL_CALLING=true` turns the model-driven path on.
+  A 3B model is enough to *choose tools correctly* and visibly not enough to
+  *write well* — see the trace's own caveats.
 - **Photo severity is switched off.** No local model has vision. `score_photo`
   returns `available: false` with a reason and contributes *nothing* to the
   urgency score rather than inventing a number. `/healthz`, the About page and
@@ -219,21 +220,21 @@ or `MODEL_PROVIDER=bedrock` with an AWS session. `/healthz` will report
 `"tool_calling": "active"`, and the activity feed will show the agent choosing
 tools rather than the pipeline calling them.
 
-**Offline fallback.** No key and no AWS session still works, with the tools
-called from Python around a completion-only local model:
+**Fully local, still model-driven.** No key and no AWS session, and the model
+still chooses its own tools — `ollama pull qwen2.5:3b` (1.9 GB):
 
 ```bash
 MODEL_PROVIDER=ollama
 OLLAMA_HOST=http://127.0.0.1:11435
-OLLAMA_MODEL_HEAVY=phi3:mini
-OLLAMA_MODEL_LIGHT=phi3:mini
-OLLAMA_TOOL_CALLING=false
+OLLAMA_MODEL_HEAVY=qwen2.5:3b
+OLLAMA_MODEL_LIGHT=qwen2.5:3b
+OLLAMA_TOOL_CALLING=true
 DDB_ENDPOINT=memory
 ```
 
-Set `OLLAMA_TOOL_CALLING=true` if the local model does support tools (qwen2.5,
-llama3.1, mistral-nemo) and it takes the same model-driven path as the hosted
-providers.
+Set `OLLAMA_TOOL_CALLING=false` for a completion-only local model (`phi3:mini`,
+`deepseek-r1:7b`); the tools are then called from Python around it, which still
+works and is what `/healthz` will report.
 
 Then:
 
@@ -273,7 +274,7 @@ Last run on this machine, verbatim:
 ```
 All checks passed!                          # ruff
 Success: no issues found in 69 source files # mypy
-367 passed                                  # pytest
+385 passed                                  # pytest
 ```
 
 `mypy` is clean in exactly the install documented above. `pdfplumber` is an
@@ -286,6 +287,73 @@ cd frontend && npx tsc --noEmit && npm run build
 
 Both clean; five routes build (`/`, `/about`, `/audit`, `/requests/[id]`,
 `/_not-found`).
+
+### The model calling its own tools
+
+```bash
+cd backend && uv run python ../scripts/tool_trace.py
+```
+
+Replays one message through the same `PipelineService` the live routes use and
+prints every tool call, separating the ones the **model chose** from the ones the
+pipeline made. It refuses to run under a completion-only provider rather than
+printing an empty trace that would read as a model declining to use its tools.
+
+Real output, `MODEL_PROVIDER=ollama` with `qwen2.5:3b` and
+`OLLAMA_TOOL_CALLING=true`:
+
+```
+provider     : ollama
+light model  : qwen2.5:3b
+tool calling : active
+
+message: 4 log chhat par phanse hain Pir Sabaq, pani tez barh raha hai, boat bhejo
+
+  NODE  extract
+        -> {'kind': 'rescue', 'confidence': 0.9}
+  NODE  geolocate
+    [MODEL] geocode_place    geocode_place(query='Pir Sabak')
+        -> {'lat': 34.0258704, 'lon': 72.0393338, 'confidence': 0.82,
+            'summary': "resolved 'Pir Sabak' ... (the model chose this query)"}
+  NODE  dedupe   -> {'duplicate_of': None, 'score': 0.0}
+  NODE  triage   -> {'urgency': 0.549948}
+  NODE  match
+    [pipe ] compute_routes   Ranking available resources by distance
+        -> {'resource_id': 'res_boat_1', 'eta_min': 30.4, 'conflict': False}
+  NODE  gate     -> {'decision_id': 'd_9e769c1f'}
+
+run took 37.7s
+tools CHOSEN BY MODEL: 1
+  - geocode_place: geocode_place(query='Pir Sabak')
+tools called by the pipeline: 1
+  - compute_routes: Ranking available resources by distance
+
+kind: rescue   people: 4   urgency: 0.549948   status: needs_decision
+location: Pir Sabak, Nowshera Tehsil, Nowshera District, ... , Pakistan (0.82)
+
+HALTED AT THE GATE: life_safety
+    [DISPATCH] SEND: Send Rescue boat Alpha
+    [no-op   ] HOLD: Hold for now
+approvals consumed : 0
+request dispatched : False
+
+PASSED: the model called its own tools, and the gate still held.
+```
+
+The model was given the message and chose to call `geocode_place` — normalising
+the spelling `Pir Sabaq` → `Pir Sabak` on the way. The confidence `0.82` is still
+computed by Python from the candidate list the tool returned, and the urgency is
+still computed before the model is asked anything.
+
+**What the trace does not show, and why.** `triage` had five context tools
+available and called none of them: qwen2.5:3b is conservative about optional tool
+use. That is the model declining, not a broken path — probed directly, the triage
+agent runs and returns. A 3B model is also visibly weak at the *prose*: it
+misreads the Roman Urdu `log` (people) as an English log. Two classes of bad
+explanation are now rejected in code and fall back to the deterministic sentence
+(`docs/decisions.md` §15); the mistranslation is a model limit and is the honest
+argument for a larger model. None of it moves the urgency, which stayed 0.505
+across three runs.
 
 ### End to end
 

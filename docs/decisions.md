@@ -262,6 +262,31 @@ only boat, and fabricated evidence there is worse than a plain description. The
 same reasoning that grounds extraction (#2) applies to prose: the model may
 phrase the answer, it may not invent the facts.
 
+**Extended on 2026-09-03, after watching qwen2.5:3b write explanations.** Two
+more rules that `prompts/triage.md` had always stated were still only requests,
+because nothing in code enforced them. Both are now checked:
+
+- **Disputing the score.** The prompt says the number is not the model's to
+  change. It wrote *"the request scores low due to the low urgency of a stranded
+  situation without immediate danger"* for a four-person roof rescue -- arguing
+  against acting, in the one sentence a coordinator reads. Describing where the
+  score lands is fine and the prompt's own example does it; only disagreement is
+  rejected.
+- **Quoting the formula.** The prompt says never to name the component values.
+  It wrote *"the low weight given to people (0.00) and the low weight given to
+  water (0.06)"*. The breakdown is already on the request detail screen for
+  anyone who wants it.
+
+**What is still not fixed, stated plainly.** qwen2.5:3b misreads the Roman Urdu
+`log` (people) as an English log, so *"4 log chhat par phanse hain"* -- four
+people trapped on a roof -- comes back as *"four people stranded on a log"*.
+Passing it the already-grounded counts instead of making it re-read the message
+helps and is worth doing on its own merits, but does not eliminate it. That is a
+model-capability limit, not a rule that can be encoded, and it is the honest
+argument for a larger model: over three runs the guards rejected two answers and
+fell back, and the third still contained the mistranslation. The urgency stayed
+0.505 throughout, because the number never depended on any of it.
+
 ---
 
 ## 16. Mona Sans carries the interface
