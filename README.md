@@ -201,9 +201,21 @@ The console shows a banner saying so whenever `DEMO_MODE` is on.
 
 ### Backend
 
+Install the extras for the provider you intend to use. Each provider's client is
+an optional dependency, so that a local-only or offline install does not pull
+the AWS or Anthropic SDKs it will never call:
+
 ```bash
-cd backend && uv sync --extra dev --extra ollama
+cd backend && uv sync --extra dev --extra ollama      # local models
+#           uv sync --extra dev --extra anthropic      # + the Anthropic client
+#           uv sync --extra dev                         # bedrock: boto3 is already a core dep
 ```
+
+`MODEL_PROVIDER=anthropic` without `--extra anthropic` fails loudly at the first
+model call with `ModelUnavailable: Provider 'anthropic' needs an optional
+dependency that is not installed` — it names the missing package rather than
+crashing obscurely. `bedrock` needs no extra because `boto3` is a core
+dependency.
 
 Create `backend/.env` from `.env.example`.
 
@@ -211,14 +223,16 @@ Create `backend/.env` from `.env.example`.
 around — use a hosted provider:
 
 ```bash
-MODEL_PROVIDER=anthropic
+MODEL_PROVIDER=anthropic     # needs: uv sync --extra anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 DDB_ENDPOINT=memory
 ```
 
 or `MODEL_PROVIDER=bedrock` with an AWS session. `/healthz` will report
 `"tool_calling": "active"`, and the activity feed will show the agent choosing
-tools rather than the pipeline calling them.
+tools rather than the pipeline calling them. Both hosted paths were verified to
+construct the model and bind the `@tool` functions to a real `Agent`; only the
+inference call needs live credentials.
 
 **Fully local, still model-driven.** No key and no AWS session, and the model
 still chooses its own tools — `ollama pull qwen2.5:3b` (1.9 GB):
