@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from conftest import make_request
+from floodrelay.api.deps import settings_dep
 from floodrelay.config import get_settings
 from floodrelay.main import create_app
 from floodrelay.services.pipeline import PipelineService, set_pipeline_service
@@ -119,15 +120,25 @@ WEBHOOK_SECRET = "test-app-secret"
 
 
 @pytest.fixture
-def signed_client(table: Table, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    """A client whose app has a webhook secret configured."""
-    monkeypatch.setenv("WEBHOOK_SECRET", WEBHOOK_SECRET)
-    get_settings.cache_clear()
+def signed_client(table: Table) -> Iterator[TestClient]:
+    """A client whose app has a webhook secret configured.
+
+    The secret is injected by overriding the settings dependency rather than by
+    setting an environment variable and clearing `get_settings`' lru_cache. The
+    cache is process-global: clearing it inside one test reaches every other
+    test in the run, which makes this file's result depend on the order it
+    happens to execute in. An override is scoped to this app instance and
+    nothing else.
+    """
     set_pipeline_service(PipelineService(use_model=False))
-    with TestClient(create_app()) as c:
+    app = create_app()
+    app.dependency_overrides[settings_dep] = lambda: get_settings().model_copy(
+        update={"webhook_secret": WEBHOOK_SECRET}
+    )
+    with TestClient(app) as c:
         yield c
+    app.dependency_overrides.clear()
     set_pipeline_service(None)
-    get_settings.cache_clear()
 
 
 def _sign(body: bytes, secret: str = WEBHOOK_SECRET) -> str:

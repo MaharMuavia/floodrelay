@@ -7,9 +7,11 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
-# Environment: never commit real credentials or contact addresses
+# Environment: never commit real credentials or contact addresses.
+# The glob matters: a hand-made .env.backup or .env.prod is exactly the file
+# that ends up holding a key, and the bare `.env` rule does not catch it.
 .env
-.env.local
+.env.*
 !.env.example
 
 # Node
