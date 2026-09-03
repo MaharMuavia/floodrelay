@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import (
     routes_audit,
     routes_board,
+    routes_context,
     routes_decisions,
     routes_demo,
     routes_intake,
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     for module in (
         routes_intake,
         routes_board,
+        routes_context,
         routes_decisions,
         routes_stream,
         routes_audit,
